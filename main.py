@@ -56,7 +56,7 @@ def main() -> NoReturn:
     # Check if the CSV needs headers and add them if it does
     check_csv_header()
 
-    schedule.every(5).seconds.do(job)
+    schedule.every(30).seconds.do(job)
 
     print("Starting exchange rate tracking app...")
     while True:
