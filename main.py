@@ -60,7 +60,11 @@ def main() -> NoReturn:
 
     print("Starting exchange rate tracking app...")
     while True:
-        run()
+        try:
+            run()
+        except Exception as exc:  # pylint: disable=broad-except
+            print(f"An error occurred: {exc}")
+            time.sleep(5)
 
 
 if __name__ == "__main__":
