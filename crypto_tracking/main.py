@@ -45,11 +45,6 @@ def check_csv_header() -> None:
         pass  # File already exists, no need to add headers
 
 
-def run() -> None:
-    schedule.run_pending()
-    time.sleep(1)
-
-
 def main() -> NoReturn:
     """Main function that starts the exchange rate tracking app."""
 
@@ -61,7 +56,9 @@ def main() -> NoReturn:
     print("Starting exchange rate tracking app...")
     while True:
         try:
-            run()
+            schedule.run_pending()
+            time.sleep(5)
+
         except Exception as exc:  # pylint: disable=broad-except
             print(f"An error occurred: {exc}")
             time.sleep(5)
