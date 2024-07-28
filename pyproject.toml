@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "crypto-tracking"
-version = "0.1.0"
+version = "0.1.1"
 description = "Simple project to keep track of USDT/ARS fluctuations of buenbit"
 authors = ["Julian Merida <julianmr97@gmail.com>"]
 license = "MIT"

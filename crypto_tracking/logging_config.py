@@ -1,66 +1,59 @@
+"""Logging configuration for the project."""
+
 from datetime import datetime
-from logging import DEBUG, ERROR, INFO, WARNING, Filter, Formatter, LogRecord, StreamHandler, getLevelName, getLogger
+from logging import DEBUG, ERROR, INFO, WARNING, Filter, Formatter, StreamHandler, getLevelName, getLogger
 from pathlib import Path
-from typing import Any, Optional
 
 
-def _create_log_folder_if_not_exists(folder_name: str) -> Path:
-    folder = Path(folder_name)
+def _create_log_folder_if_not_exists(folder: Path) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     return folder
 
 
-def get_current_date() -> str:
-    return datetime.today().strftime("%Y_%m_%d_%H_%M_%S")
-
-
-def _get_date_string_for_filename(log_type: str, date: str) -> str:
+def _get_log_file_using_date_in_name(log_type: str, project_folder: Path) -> Path:
+    date = datetime.today().strftime("%Y_%m_%d_%H_%M_%S")
     folder_name = f"logs/{log_type}"
-    _create_log_folder_if_not_exists(folder_name)
-    return f"{folder_name}/{date}.log"
+    folder = _create_log_folder_if_not_exists(project_folder / folder_name)
+    return folder / f"{date}.log"
 
 
 class LogLevelFilter(Filter):
-    def __init__(self, level: int) -> None:
-        super().__init__()
+    def __init__(self, level) -> None:
         self.level = level
 
-    def filter(self, record: LogRecord) -> bool:
+    def filter(self, record) -> bool:
         return record.levelno == self.level
 
 
 logger = getLogger(__name__)
 
 
-class LazyFileHandler(StreamHandler):  # type: ignore
+class LazyFileHandler(StreamHandler):
     """
     Custom logging handler that lazily opens the log file.
     The file is only opened when a log record is emitted, preventing the creation of empty log files.
     """
 
-    def __init__(self, filename: str, mode: str = "a", encoding: Any = None) -> None:
+    def __init__(self, filename, mode="a", encoding=None):
         self.base_filename = filename
         self.mode = mode
         self.encoding = encoding
-        self._file: Optional[Any] = None
+        self._file = None
         StreamHandler.__init__(self)
 
-    def _open_file(self) -> Optional[Any]:
+    def _open_file(self):
         if self._file is None:
-            self._file = open(  # pylint: disable=consider-using-with
-                self.base_filename, self.mode, encoding=self.encoding
-            )
+            self._file = open(self.base_filename, self.mode, encoding=self.encoding)
         return self._file
 
-    def emit(self, record: LogRecord) -> None:
+    def emit(self, record):
         self.stream = self._open_file()
         StreamHandler.emit(self, record)
 
 
-def _set_log_to_file(log_level: int) -> None:
+def _set_log_to_file(log_level, project_folder: Path) -> None:
     log_type = getLevelName(log_level)
-    date = get_current_date()
-    logfile = _get_date_string_for_filename(log_type=log_type, date=date)
+    logfile = _get_log_file_using_date_in_name(log_type, project_folder=project_folder)
     file_handler = LazyFileHandler(logfile)
     file_handler.setLevel(log_level)
     formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -70,7 +63,7 @@ def _set_log_to_file(log_level: int) -> None:
     logger.addHandler(file_handler)
 
 
-def _set_log_to_terminal(log_level: int) -> None:
+def _set_log_to_terminal(log_level) -> None:
     stream_handler = StreamHandler()
     stream_handler.setLevel(log_level)
     formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -79,7 +72,11 @@ def _set_log_to_terminal(log_level: int) -> None:
 
 
 def configure_logger(
-    debug: bool, info: bool, enable_log_to_file: bool = True, enable_log_to_terminal: bool = True
+    project_folder: Path,
+    debug: bool = True,
+    info: bool = True,
+    enable_log_to_file=True,
+    enable_log_to_terminal=True,
 ) -> None:
     if debug:
         logger.setLevel(DEBUG)
@@ -87,10 +84,10 @@ def configure_logger(
         logger.setLevel(INFO)
 
     if enable_log_to_file:
-        _set_log_to_file(ERROR)
-        _set_log_to_file(WARNING)
-        _set_log_to_file(INFO)
-        _set_log_to_file(DEBUG)
+        _set_log_to_file(ERROR, project_folder=project_folder)
+        _set_log_to_file(WARNING, project_folder=project_folder)
+        _set_log_to_file(INFO, project_folder=project_folder)
+        _set_log_to_file(DEBUG, project_folder=project_folder)
 
     if enable_log_to_terminal:
         _set_log_to_terminal(DEBUG if debug else INFO)
