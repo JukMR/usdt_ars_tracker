@@ -7,13 +7,17 @@ from typing import Any, Dict, NoReturn
 
 import requests
 import schedule
+from logging_config import configure_logger, logger
 
 
-def fetch_exchange_rate() -> Dict[str, Any]:
+def fetch_exchange_rate(polling_rate: int) -> Dict[str, Any]:
     """Fetch the latest exchange rate from the API."""
     url = "https://criptoya.com/api/usdt/ars"
-    response = requests.get(url, timeout=5)
+    timeout: int = int(polling_rate * 0.8)
+    response = requests.get(url, timeout=timeout)
+    response.raise_for_status()
     data = response.json()
+
     return data.get("buenbit", {})
 
 
@@ -24,16 +28,17 @@ def store_exchange_rate_to_csv(buy: float, sell: float) -> None:
         writer.writerow([datetime.now(), "buenbit", buy, sell])
 
 
-def job() -> None:
+def job(polling_rate: int) -> None:
     """The scheduled job that fetches and stores the exchange rate."""
-    rate_data = fetch_exchange_rate()
+    logger.info("Fetching exchange rate...")
+    rate_data: dict[str, Any] = fetch_exchange_rate(polling_rate=polling_rate)
     if rate_data:
         buy = float(rate_data["totalAsk"])
         sell = float(rate_data["totalBid"])
 
         store_exchange_rate_to_csv(buy=buy, sell=sell)
-        print(f"Stored new buy: {rate_data['totalAsk']} at {datetime.now()}")
-        print(f"Stored new sell: {rate_data['totalBid']} at {datetime.now()}")
+        logger.info(f"Stored new buy: {rate_data['totalAsk']} at {datetime.now()}")
+        logger.info(f"Stored new sell: {rate_data['totalBid']} at {datetime.now()}")
 
 
 def check_csv_header() -> None:
@@ -48,19 +53,22 @@ def check_csv_header() -> None:
 def main() -> NoReturn:
     """Main function that starts the exchange rate tracking app."""
 
+    # Configure logger
+    configure_logger(debug=True, info=True)
+
     # Check if the CSV needs headers and add them if it does
     check_csv_header()
 
-    schedule.every(30).seconds.do(job)
+    schedule.every(60).seconds.do(job, polling_rate=60)
 
-    print("Starting exchange rate tracking app...")
+    logger.info("Starting exchange rate tracking app...")
     while True:
         try:
             schedule.run_pending()
             time.sleep(5)
 
         except Exception as exc:  # pylint: disable=broad-except
-            print(f"An error occurred: {exc}")
+            logger.info(f"An error occurred: {exc}")
             time.sleep(5)
 
 
