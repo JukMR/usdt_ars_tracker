@@ -59,7 +59,7 @@ def main() -> NoReturn:
     """Main function that starts the exchange rate tracking app."""
 
     # Configure project folders
-    project_folder: Path = Path(__file__).resolve().parent.parent
+    project_folder: Path = Path(__file__).resolve().parent
     assert project_folder.name == "crypto_tracking", "Project folder is not named 'crypto_tracking'"
 
     data_folder: Path = project_folder / "data"
