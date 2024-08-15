@@ -11,6 +11,7 @@ def home():
     if request.method == "POST":
         min_num = request.form["min_num"]
         max_num = request.form["max_num"]
+
         # Send the numbers to the backend server
         response = requests.post(localhost_url, json={"min_num": min_num, "max_num": max_num}, timeout=60)
         response.raise_for_status()

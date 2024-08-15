@@ -1,11 +1,17 @@
-from flask import Flask, request, jsonify
+from flask import Flask, Response, jsonify, request
 
 app = Flask(__name__)
 
 
+@app.route("/metrics", methods=["GET"])
+def get_current_price():
+    current_value = read_value()
+    return current_value
+
+
 # Define a route to handle the numbers
 @app.route("/api/numbers", methods=["POST"])
-def handle_numbers():
+def handle_numbers() -> Response:
     data = request.get_json()
     print("received post")
 
