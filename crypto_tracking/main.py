@@ -1,53 +1,26 @@
 """Main module that fetches and stores the exchange rate from Buenbit."""
 
 import csv
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, NoReturn
+from typing import Any, NoReturn
 
-import requests
 import schedule
 
+from crypto_tracking.api_poller.poller import fetch_exchange_rate
 from crypto_tracking.logging_config import configure_logger, logger
+from crypto_tracking.metrics_server.backend import backend_main
+from crypto_tracking.metrics_server.backend.backend_main import run_backend
 from crypto_tracking.metrics_server.backend.database.database_service import DatabaseService, Engine
 from crypto_tracking.metrics_server.backend.database.database_session import DatabaseSession
 from crypto_tracking.metrics_server.backend.database.sql_models import Entry
-
-
-def fetch_exchange_rate(polling_rate: int) -> Dict[str, Any]:
-    """Fetch the latest exchange rate from the API."""
-    url = "https://criptoya.com/api/usdt/ars"
-    timeout: int = int(polling_rate * 0.8)  # 80% of the polling rate
-    response = requests.get(url, timeout=timeout)
-    response.raise_for_status()
-    data = response.json()
-
-    return data.get("buenbit", {})
-
-
-def store_exchange_rate_to_csv(buy: float, sell: float, data_folder: Path) -> None:
-    """Store the fetched exchange rate into a CSV file."""
-    exchange_rate_file: Path = data_folder / "exchange_rates.csv"
-
-    with open(exchange_rate_file, mode="a", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow([datetime.now(), "buenbit", buy, sell])
-
-
-def check_csv_header(data_folder: Path) -> None:
-    output_file = data_folder / "exchange_rates.csv"
-    try:
-        with open(output_file, "x", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(["timestamp", "source", "buy", "sell"])
-
-    except FileExistsError:
-        pass  # File already exists, no need to add headers
+from crypto_tracking.metrics_server.frontend.frontend_main import run_frontend
 
 
 class Storer:
-    def __init__(self, data_folder: Path, polling_rate: int, project_folder: Path) -> None:
+    def __init__(self, data_folder: Path, polling_rate: int, project_folder: Path, db_engine: Engine) -> None:
         self.data_folder: Path = data_folder
         self.polling_rate: int = polling_rate
         self.project_folder: Path = project_folder
@@ -69,7 +42,6 @@ class Storer:
 
             logger.info("Stored new buy: %s at %s", rate_data["totalAsk"], current_time)
             logger.info("Stored new sell: %s at %s", rate_data["totalBid"], current_time)
-        return store_exchange_rate_to_csv(buy=buy, sell=sell, data_folder=self.data_folder)
 
     def store(self, source: str, buy: float, sell: float, current_time: datetime) -> None:
         self.insert_entry_in_database(current_time=current_time, source=source, buy=buy, sell=sell)
@@ -80,23 +52,18 @@ class Storer:
             db_service.add(Entry(datetime=current_time, source=source, buy=buy, sell=sell))
 
 
-def main() -> NoReturn:
-    """Main function that starts the exchange rate tracking app."""
+def prepare_database(project_folder: Path) -> Engine:
+    return DatabaseService(project_folder=project_folder).start()
 
-    # Configure project folders
-    project_folder: Path = Path(__file__).resolve().parent
-    assert project_folder.name == "crypto_tracking", "Project folder is not named 'crypto_tracking'"
 
+def poller(project_folder: Path, db_engine: Engine) -> NoReturn:
     data_folder: Path = project_folder / "data"
-    data_folder.mkdir(exist_ok=True)
-
-    # Configure logger
-    configure_logger(project_folder=project_folder)
-
-    # Main code
+    assert data_folder.exists(), f"Data folder {data_folder} does not exist"
 
     polling_rate: int = 60
-    job_instance: Storer = Storer(data_folder=data_folder, polling_rate=polling_rate, project_folder=project_folder)
+    job_instance: Storer = Storer(
+        data_folder=data_folder, polling_rate=polling_rate, project_folder=project_folder, db_engine=db_engine
+    )
 
     schedule.every(polling_rate).seconds.do(job_instance.job)
 
@@ -111,6 +78,37 @@ def main() -> NoReturn:
 
         finally:
             time.sleep(5)
+
+
+def main() -> None:
+    """Main function that starts the exchange rate tracking app."""
+
+    # Configure project folders
+    project_folder: Path = Path(__file__).resolve().parent
+    assert project_folder.name == "crypto_tracking", "Project folder is not named 'crypto_tracking'"
+
+    data_folder: Path = project_folder / "data"
+    data_folder.mkdir(exist_ok=True)
+
+    # Configure logger
+    configure_logger(project_folder=project_folder)
+
+    # Main code
+
+    database: Engine = prepare_database(project_folder=project_folder)
+
+    # Run these tasks asyncronously on separate thread
+    # Run the poller
+    poller_thread = threading.Thread(target=poller, kwargs={"project_folder": project_folder, "db_engine": database})
+    poller_thread.start()
+
+    # Run the backend
+    backend_thread = threading.Thread(target=run_backend, kwargs={"db_engine": database})
+    backend_thread.start()
+
+    # Run the frontend
+    frontend_thread = threading.Thread(target=run_frontend)
+    frontend_thread.start()
 
 
 if __name__ == "__main__":
