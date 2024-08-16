@@ -1,43 +1,44 @@
 import os
+from pathlib import Path
 
-from sqlalchemy import MetaData, Table, create_engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import Engine, MetaData, Table, create_engine
 
-from crypto_tracking.metrics_server.backend.database.migrate_to_database import create_database
+from crypto_tracking.metrics_server.backend import database
+from crypto_tracking.metrics_server.backend.database.create_database import DatabasePopulator
+from crypto_tracking.metrics_server.backend.database.sql_models import Base
 
 DB_NAME: str = "crypto_tracking.db"
 
 
-def database_exists() -> bool:
-    """Check if the database and table 'entry' exist."""
-    engine = create_engine(f"sqlite:///{DB_NAME}")
-    try:
-        metadata = MetaData(bind=engine)
-        entry_table: Table = Table("entry", metadata, autoload_with=engine)
-        return True
+class DatabaseService:
+    """Database service class."""
 
-    except OperationalError:
-        return False
+    def __init__(self, project_folder: Path) -> None:
+        self.project_folder: Path = project_folder
+        self.database_path: Path = self.project_folder / DB_NAME
 
+    def _database_exists(self) -> bool:
+        return self.database_path.exists()
 
-def run_database() -> None:
-    """Simulate starting the database service."""
-    # SQLite is a file-based database, so no service needs to be started.
-    # But if you have additional services or tasks, you can handle them here.
-    if not os.path.exists(DB_NAME):
-        raise FileNotFoundError(f"Database '{DB_NAME}' not found.")
-    print("Database is ready for use")
+    def _create_database(self) -> Engine:
+        """Create the database and tables"""
 
+        engine = self._get_database()
+        Base.metadata.create_all(engine)
 
-def start():
-    """Check if the database exists and start it."""
-    if not database_exists():
-        create_database()
-    else:
-        print("Database already exists")
+        # Populate db with csv file
 
-    run_database()
+        DatabasePopulator(project_folder=self.project_folder, db_engine=engine).populate_database()
 
+        return engine
 
-if __name__ == "__main__":
-    start()
+    def _get_database(self) -> Engine:
+        """Get the database engine."""
+        return create_engine(f"sqlite:///{self.database_path}")
+
+    def start(self) -> Engine:
+        """Start the database service."""
+        if not self._database_exists():
+            self._create_database()
+
+        return self._get_database()

@@ -49,7 +49,7 @@ def check_csv_header(data_folder: Path) -> None:
     try:
         with open(output_file, "x", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
-            writer.writerow(["Timestamp", "Source", "Buy", "Sell"])
+            writer.writerow(["timestamp", "source", "buy", "sell"])
 
     except FileExistsError:
         pass  # File already exists, no need to add headers
@@ -79,13 +79,12 @@ def main() -> NoReturn:
     logger.info("Starting exchange rate tracking app...")
 
     while True:
+        time.sleep(5)
         try:
             schedule.run_pending()
-            time.sleep(5)
 
         except Exception as exc:  # pylint: disable=broad-except
             logger.info(f"An error occurred: {exc}")
-            time.sleep(5)
 
 
 if __name__ == "__main__":

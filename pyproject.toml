@@ -11,6 +11,9 @@ python = "^3.11"
 schedule = "^1.2.1"
 requests = "^2.31.0"
 flask = "^3.0.3"
+sqlalchemy = "^2.0.32"
+pydantic = "^2.8.2"
+pandas = "^2.2.2"
 
 
 [build-system]
