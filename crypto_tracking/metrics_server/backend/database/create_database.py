@@ -1,27 +1,11 @@
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 from sqlalchemy import Engine
-from sqlalchemy.orm import sessionmaker
 
+from crypto_tracking.metrics_server.backend.database.database_session import DatabaseSession
 from crypto_tracking.metrics_server.backend.database.sql_models import Entry
 from crypto_tracking.metrics_server.backend.values_model import Values
-
-
-class DatabaseSession:
-    def __init__(self, engine: Engine) -> None:
-        self.engine = engine
-        self.session = None
-
-    def __enter__(self) -> Any:
-        Session = sessionmaker(bind=self.engine)
-        self.session = Session()
-        return self.session
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.session.commit()
-        self.session.close()
 
 
 class DatabasePopulator:
@@ -43,6 +27,7 @@ class DatabasePopulator:
                 session.add(entry)
 
     def load_total_values(self) -> list[Values]:
+        """Load values from the CSV file, validate them and return them as a list of Values objects"""
         data_folder: Path = self.project_folder / "data"
         assert data_folder.exists(), f"Data folder not found: {data_folder}"
 

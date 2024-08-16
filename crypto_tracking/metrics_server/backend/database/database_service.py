@@ -1,9 +1,7 @@
-import os
 from pathlib import Path
 
-from sqlalchemy import Engine, MetaData, Table, create_engine
+from sqlalchemy import Engine, create_engine
 
-from crypto_tracking.metrics_server.backend import database
 from crypto_tracking.metrics_server.backend.database.create_database import DatabasePopulator
 from crypto_tracking.metrics_server.backend.database.sql_models import Base
 

@@ -1,7 +1,8 @@
+import time
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from crypto_tracking.metrics_server.backend.database.database_service import DatabaseService
 from crypto_tracking.metrics_server.backend.values_model import Values
@@ -14,16 +15,16 @@ def read_latest_value(db_engine: Engine) -> Values:
     # and return it as a Values object
 
     with db_engine.connect() as connection:
-        results = connection.execute(text("SELECT * FROM entry ORDER BY date DESC LIMIT 1"))
+        results = connection.execute(text("SELECT * FROM entries ORDER BY datetime DESC LIMIT 1"))
         for row in results:
-            assert len(results) <= 1, f"Expected at most 1 result, but got {len(results)}"
-            return Values(timestamp=row["date"], source=row["source"], buy=row["buy"], sell=row["sell"])
+            timestamp, source, buy, sell = row
+            return Values(timestamp=timestamp, source=source, buy=buy, sell=sell)
 
     raise ValueError("No values found in the database")
 
 
 @app.route("/metrics", methods=["GET"])
-def get_current_price():
+def get_current_price() -> Response:
     current_value: Values = read_latest_value(db_engine=db_engine)
     print(f"Fetched latest value and it is: {current_value}")
 

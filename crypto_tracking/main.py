@@ -8,7 +8,11 @@ from typing import Any, Dict, NoReturn
 
 import requests
 import schedule
-from logging_config import configure_logger, logger
+
+from crypto_tracking.logging_config import configure_logger, logger
+from crypto_tracking.metrics_server.backend.database.database_service import DatabaseService, Engine
+from crypto_tracking.metrics_server.backend.database.database_session import DatabaseSession
+from crypto_tracking.metrics_server.backend.database.sql_models import Entry
 
 
 def fetch_exchange_rate(polling_rate: int) -> Dict[str, Any]:
@@ -31,19 +35,6 @@ def store_exchange_rate_to_csv(buy: float, sell: float, data_folder: Path) -> No
         writer.writerow([datetime.now(), "buenbit", buy, sell])
 
 
-def job(polling_rate: int, data_folder: Path) -> None:
-    """The scheduled job that fetches and stores the exchange rate."""
-    logger.info("Fetching exchange rate...")
-    rate_data: dict[str, Any] = fetch_exchange_rate(polling_rate=polling_rate)
-    if rate_data:
-        buy = float(rate_data["totalAsk"])
-        sell = float(rate_data["totalBid"])
-
-        store_exchange_rate_to_csv(buy=buy, sell=sell, data_folder=data_folder)
-        logger.info(f"Stored new buy: {rate_data['totalAsk']} at {datetime.now()}")
-        logger.info(f"Stored new sell: {rate_data['totalBid']} at {datetime.now()}")
-
-
 def check_csv_header(data_folder: Path) -> None:
     output_file = data_folder / "exchange_rates.csv"
     try:
@@ -53,6 +44,40 @@ def check_csv_header(data_folder: Path) -> None:
 
     except FileExistsError:
         pass  # File already exists, no need to add headers
+
+
+class Storer:
+    def __init__(self, data_folder: Path, polling_rate: int, project_folder: Path) -> None:
+        self.data_folder: Path = data_folder
+        self.polling_rate: int = polling_rate
+        self.project_folder: Path = project_folder
+
+        self.database_engine: Engine = DatabaseService(project_folder=self.project_folder).start()
+
+    def job(
+        self,
+    ) -> None:
+        logger.info("Fetching exchange rate...")
+        rate_data: dict[str, Any] = fetch_exchange_rate(polling_rate=self.polling_rate)
+        if rate_data:
+            buy = float(rate_data["totalAsk"])
+            sell = float(rate_data["totalBid"])
+
+            source: str = "buenbit"
+            current_time: datetime = datetime.now()
+            self.store(current_time=current_time, source=source, buy=buy, sell=sell)
+
+            logger.info("Stored new buy: %s at %s", rate_data["totalAsk"], current_time)
+            logger.info("Stored new sell: %s at %s", rate_data["totalBid"], current_time)
+        return store_exchange_rate_to_csv(buy=buy, sell=sell, data_folder=self.data_folder)
+
+    def store(self, source: str, buy: float, sell: float, current_time: datetime) -> None:
+        self.insert_entry_in_database(current_time=current_time, source=source, buy=buy, sell=sell)
+
+    def insert_entry_in_database(self, current_time: datetime, source: str, buy: float, sell: float) -> None:
+        """Insert the fetched exchange rate into a database."""
+        with DatabaseSession(engine=self.database_engine) as db_service:
+            db_service.add(Entry(datetime=current_time, source=source, buy=buy, sell=sell))
 
 
 def main() -> NoReturn:
@@ -68,23 +93,24 @@ def main() -> NoReturn:
     # Configure logger
     configure_logger(project_folder=project_folder)
 
-    # Check if the CSV needs headers and add them if it does
-    check_csv_header(data_folder=data_folder)
-
     # Main code
 
     polling_rate: int = 60
-    schedule.every(polling_rate).seconds.do(job, polling_rate=polling_rate, data_folder=data_folder)
+    job_instance: Storer = Storer(data_folder=data_folder, polling_rate=polling_rate, project_folder=project_folder)
+
+    schedule.every(polling_rate).seconds.do(job_instance.job)
 
     logger.info("Starting exchange rate tracking app...")
 
     while True:
-        time.sleep(5)
         try:
             schedule.run_pending()
 
         except Exception as exc:  # pylint: disable=broad-except
-            logger.info(f"An error occurred: {exc}")
+            logger.info("An error occurred: %s", exc)
+
+        finally:
+            time.sleep(5)
 
 
 if __name__ == "__main__":
