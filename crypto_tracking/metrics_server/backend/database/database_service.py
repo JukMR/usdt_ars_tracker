@@ -2,6 +2,7 @@ from pathlib import Path
 
 from sqlalchemy import Engine, create_engine
 
+from crypto_tracking.logging_config import logger
 from crypto_tracking.metrics_server.backend.database.create_database import DatabasePopulator
 from crypto_tracking.metrics_server.backend.database.sql_models import Base
 
@@ -37,6 +38,9 @@ class DatabaseService:
     def start(self) -> Engine:
         """Start the database service."""
         if not self._database_exists():
+            logger.info("Database does not exist. Creating a new one...")
             self._create_database()
+        else:
+            logger.info("Database already exists. Connecting to it...")
 
         return self._get_database()

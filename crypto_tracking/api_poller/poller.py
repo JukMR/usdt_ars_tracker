@@ -48,7 +48,7 @@ class _Storer:
         self.polling_rate: int = polling_rate
         self.project_folder: Path = project_folder
 
-        self.database_engine: Engine = DatabaseService(project_folder=self.project_folder).start()
+        self.database_engine: Engine = db_engine
 
     def job(
         self,
