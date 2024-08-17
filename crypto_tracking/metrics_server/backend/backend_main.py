@@ -50,7 +50,7 @@ def set_alert_thresholds() -> Response:
 
 def run_backend(db_engine: Engine) -> None:
     app.config["DB_ENGINE"] = db_engine
-    app.run(debug=False, port=5001)
+    app.run(debug=True, port=5001)
 
 
 def main() -> None:
