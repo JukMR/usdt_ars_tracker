@@ -19,9 +19,5 @@ def home():
     return render_template("index.html")
 
 
-def run_frontend() -> None:
-    app.run(debug=False)
-
-
 if __name__ == "__main__":
-    run_frontend()
+    app.run(debug=False)
