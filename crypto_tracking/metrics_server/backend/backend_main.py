@@ -53,9 +53,13 @@ def run_backend(db_engine: Engine) -> None:
     app.run(debug=False, port=5001)
 
 
-if __name__ == "__main__":
+def main() -> None:
     project_folder: Path = Path(__file__).resolve().parent.parent.parent
     assert project_folder.name == "crypto_tracking", "Project folder is not named 'crypto_tracking'"
 
     db_engine = DatabaseService(project_folder=project_folder).start()
     run_backend(db_engine=db_engine)
+
+
+if __name__ == "__main__":
+    main()

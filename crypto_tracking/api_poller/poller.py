@@ -25,14 +25,8 @@ def fetch_exchange_rate(polling_rate: int) -> dict[str, Any]:
     return data.get("buenbit", {})
 
 
-def poller(project_folder: Path, db_engine: Engine) -> NoReturn:
-    data_folder: Path = project_folder / "data"
-    assert data_folder.exists(), f"Data folder {data_folder} does not exist"
-
-    polling_rate: int = 60
-    job_instance: Storer = Storer(
-        data_folder=data_folder, polling_rate=polling_rate, project_folder=project_folder, db_engine=db_engine
-    )
+def poller(project_folder: Path, db_engine: Engine, polling_rate: int = 60) -> NoReturn:
+    job_instance: _Storer = _Storer(polling_rate=polling_rate, project_folder=project_folder, db_engine=db_engine)
 
     schedule.every(polling_rate).seconds.do(job_instance.job)
 
@@ -49,9 +43,8 @@ def poller(project_folder: Path, db_engine: Engine) -> NoReturn:
             time.sleep(5)
 
 
-class Storer:
-    def __init__(self, data_folder: Path, polling_rate: int, project_folder: Path, db_engine: Engine) -> None:
-        self.data_folder: Path = data_folder
+class _Storer:
+    def __init__(self, polling_rate: int, project_folder: Path, db_engine: Engine) -> None:
         self.polling_rate: int = polling_rate
         self.project_folder: Path = project_folder
 
@@ -82,11 +75,16 @@ class Storer:
             db_service.add(Entry(datetime=current_time, source=source, buy=buy, sell=sell))
 
 
-if __name__ == "__main__":
+def main() -> None:
     project_folder: Path = Path(__file__).resolve().parent.parent
     assert project_folder.name == "crypto_tracking", "Project folder is not named 'crypto_tracking'"
 
     configure_logger(project_folder=project_folder)
 
     db_engine: Engine = DatabaseService(project_folder=project_folder).start()
-    poller(project_folder=project_folder, db_engine=db_engine)
+    polling_rate: int = 60
+    poller(project_folder=project_folder, db_engine=db_engine, polling_rate=polling_rate)
+
+
+if __name__ == "__main__":
+    main()
