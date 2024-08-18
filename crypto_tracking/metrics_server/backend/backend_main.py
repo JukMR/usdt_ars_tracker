@@ -11,7 +11,7 @@ from crypto_tracking.metrics_server.backend.values_model import Values
 app = Flask(__name__)
 
 
-def get_db_engine():
+def _get_db_engine():
     return current_app.config["DB_ENGINE"]
 
 
@@ -19,7 +19,7 @@ def read_latest_value() -> Values:
     # This function should read the latest value from the database
     # and return it as a Values object
 
-    db_engine = get_db_engine()
+    db_engine = _get_db_engine()
     with db_engine.connect() as connection:
         results = connection.execute(text("SELECT * FROM entries ORDER BY datetime DESC LIMIT 1"))
         for row in results:
