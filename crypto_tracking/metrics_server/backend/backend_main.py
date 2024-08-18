@@ -3,6 +3,8 @@ from pathlib import Path
 from flask import Flask, Response, current_app, jsonify, request
 from sqlalchemy import Engine, text
 
+from crypto_tracking.metrics_server.backend.alert_handler import Alert, Operators
+from crypto_tracking.metrics_server.backend.alert_handler import alerter_instance as alerter
 from crypto_tracking.metrics_server.backend.database.database_service import DatabaseService
 from crypto_tracking.metrics_server.backend.values_model import Values
 
@@ -29,23 +31,62 @@ def read_latest_value() -> Values:
 
 @app.route("/metrics", methods=["GET"])
 def get_current_price() -> Response:
+    """Get the current price of the cryptocurrency"""
     current_value: Values = read_latest_value()
-    print(f"Fetched latest value and it is: {current_value}")
-
-    return jsonify("current_value")
+    return jsonify(f"data: {current_value}")
 
 
 # Define a route to handle the numbers
 @app.route("/api/numbers", methods=["POST"])
 def set_alert_thresholds() -> Response:
-    data = request.get_json()
-    print("received post")
+    """Set the alert thresholds for the minimum and maximum values"""
+    data: dict | None = request.get_json()
+    if data is None:
+        return jsonify({"error": "No data provided"})
 
-    min_num = data["min_num"]
-    max_num = data["max_num"]
-    # Process the numbers here (e.g., store them in a database, perform calculations, etc.)
-    print(f"Received numbers: min={min_num}, max={max_num}")
-    return jsonify({"message": "Numbers received successfully!"})
+    return AlertThresholdSetter(data).set_alert()
+
+
+class AlertThresholdSetter:
+    def __init__(self, data: dict) -> None:
+        self.data = data
+        self.min_num: str | None = data.get("min_num")
+        self.max_num: str | None = data.get("max_num")
+
+    def set_alert(self) -> Response:
+        if self.min_num is None and self.max_num is None:
+            return jsonify({"error": "Please provide min_num or max_num"})
+
+        if self.min_num is not None and self.max_num is not None:
+            self.set_minimum_threshold(self.min_num)
+            self.set_maximum_threshold(self.max_num)
+            return jsonify(
+                {
+                    "message": f"Min alert set successfully to {self.min_num} and Max alert set successfully to {self.max_num}"
+                }
+            )
+
+        if self.min_num is not None:
+            self.set_minimum_threshold(self.min_num)
+            return jsonify({"message": f"Min alert set successfully to {self.min_num}"})
+
+        if self.max_num is not None:
+            self.set_maximum_threshold(self.max_num)
+            return jsonify({"message": f"Max alert set successfully to {self.max_num}"})
+
+        raise ValueError("Invalid input")
+
+    @staticmethod
+    def set_minimum_threshold(min_num: str) -> None:
+        """Set the minimum threshold for the alert"""
+        min_num_float = float(min_num)
+        alerter.add_alert(Alert("USDT", min_num_float, Operators.LESS_THAN, "email"))
+
+    @staticmethod
+    def set_maximum_threshold(max_num: str) -> None:
+        """Set the maximum threshold for the alert"""
+        max_num_float = float(max_num)
+        alerter.add_alert(Alert("USDT", max_num_float, Operators.GREATER_THAN, "email"))
 
 
 def run_backend(db_engine: Engine) -> None:
