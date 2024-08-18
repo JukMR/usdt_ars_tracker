@@ -3,9 +3,6 @@ from enum import Enum
 
 from flask import Response, jsonify
 
-from crypto_tracking.metrics_server.backend.alert_handler import Alert, Operators
-from crypto_tracking.metrics_server.backend.alert_handler import alerter_instance as alerter
-
 
 class Operators(Enum):
     """The operators to use for the alert"""
@@ -65,13 +62,17 @@ class Alerter:
             if alert.check(data):
                 alert.send_alert()
 
-    def add_alert(self, Alert: Alert) -> None:
-        self.alerts.append(Alert)
+    def add_alert(self, alert: Alert) -> None:
+        self.alerts.append(alert)
+
+
+alerter_instance = Alerter()
 
 
 class AlertThresholdSetter:
-    def __init__(self, data: dict) -> None:
+    def __init__(self, data: dict, alerter: Alerter) -> None:
         self.data = data
+        self.alerter: Alerter = alerter
         self.min_num: str | None = data.get("min_num")
         self.max_num: str | None = data.get("max_num")
 
@@ -98,17 +99,12 @@ class AlertThresholdSetter:
 
         raise ValueError("Invalid input")
 
-    @staticmethod
-    def set_minimum_threshold(min_num: str) -> None:
+    def set_minimum_threshold(self, min_num: str) -> None:
         """Set the minimum threshold for the alert"""
         min_num_float = float(min_num)
-        alerter.add_alert(Alert("USDT", min_num_float, Operators.LESS_THAN, "email"))
+        self.alerter.add_alert(Alert("USDT", min_num_float, Operators.LESS_THAN, Notifier.EMAIL))
 
-    @staticmethod
-    def set_maximum_threshold(max_num: str) -> None:
+    def set_maximum_threshold(self, max_num: str) -> None:
         """Set the maximum threshold for the alert"""
         max_num_float = float(max_num)
-        alerter.add_alert(Alert("USDT", max_num_float, Operators.GREATER_THAN, "email"))
-
-
-alerter_instance = Alerter()
+        self.alerter.add_alert(Alert("USDT", max_num_float, Operators.GREATER_THAN, Notifier.EMAIL))
