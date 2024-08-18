@@ -16,34 +16,35 @@ class IntervalTypes(Enum):
     MONTHLY = 30
 
 
-def _get_min_max_interval(db_engine: Engine, interval_type: IntervalTypes) -> tuple[int, int]:
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=interval_type.value)
+class GetMinMaxValues:
+    def __init__(self, db_engine: Engine) -> None:
+        self.db_engine = db_engine
 
-    with db_engine.connect() as connection:
-        results = connection.execute(
-            text("SELECT MIN(sell), MAX(sell) FROM entries WHERE datetime >= :start_date"), {"start_date": start_date}
-        )
-        for row in results:
-            min_val, max_val = row
-            return min_val, max_val
-    raise ValueError("No values found in the database")
+    def _get_min_max_interval(self, interval_type: IntervalTypes) -> tuple[int, int]:
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=interval_type.value)
 
+        with self.db_engine.connect() as connection:
+            results = connection.execute(
+                text("SELECT MIN(sell), MAX(sell) FROM entries WHERE datetime >= :start_date"),
+                {"start_date": start_date},
+            )
+            for row in results:
+                min_val, max_val = row
+                return min_val, max_val
+        raise ValueError("No values found in the database")
 
-def get_min_max_daily(db_engine: Engine) -> tuple[int, int]:
-    return _get_min_max_interval(db_engine, IntervalTypes.DAILY)
+    def get_min_max_daily(self) -> tuple[int, int]:
+        return self._get_min_max_interval(IntervalTypes.DAILY)
 
+    def get_min_max_weekly(self) -> tuple[int, int]:
+        return self._get_min_max_interval(IntervalTypes.WEEKLY)
 
-def get_min_max_weekly(db_engine: Engine) -> tuple[int, int]:
-    return _get_min_max_interval(db_engine, IntervalTypes.WEEKLY)
+    def get_min_max_two_weeks(self) -> tuple[int, int]:
+        return self._get_min_max_interval(IntervalTypes.TWO_WEEKS)
 
-
-def get_min_max_two_weeks(db_engine: Engine) -> tuple[int, int]:
-    return _get_min_max_interval(db_engine, IntervalTypes.TWO_WEEKS)
-
-
-def get_min_max_monthly(db_engine: Engine) -> tuple[int, int]:
-    return _get_min_max_interval(db_engine, IntervalTypes.MONTHLY)
+    def get_min_max_monthly(self) -> tuple[int, int]:
+        return self._get_min_max_interval(IntervalTypes.MONTHLY)
 
 
 if __name__ == "__main__":
@@ -54,7 +55,9 @@ if __name__ == "__main__":
 
     configure_logger(project_folder=project_folder)
     db_engine = DatabaseService(project_folder=project_folder).start()
-    print(get_min_max_daily(db_engine))
-    print(get_min_max_weekly(db_engine))
-    print(get_min_max_two_weeks(db_engine))
-    print(get_min_max_monthly(db_engine))
+
+    min_max_getter: GetMinMaxValues = GetMinMaxValues(db_engine)
+    print(min_max_getter.get_min_max_daily())
+    print(min_max_getter.get_min_max_weekly())
+    print(min_max_getter.get_min_max_two_weeks())
+    print(min_max_getter.get_min_max_monthly())
