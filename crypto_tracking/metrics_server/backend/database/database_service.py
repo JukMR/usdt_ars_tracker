@@ -26,7 +26,7 @@ class DatabaseService:
         Base.metadata.create_all(engine)
 
         # Populate db with csv file
-        if self.csv_file_exists():
+        if self._csv_file_exists():
             logger.info("Populating database with values from CSV file...")
             DatabaseFromCSVPopulator(project_folder=self.project_folder, db_engine=engine).populate_database()
 
@@ -35,13 +35,9 @@ class DatabaseService:
 
         return engine
 
-    def csv_file_exists(self) -> bool:
+    def _csv_file_exists(self) -> bool:
         """Check if the CSV file exists."""
         return (self.project_folder / "data" / "exchange_rates.csv").exists()
-
-    def _create_new_engine_instance(self) -> Engine:
-        """Get the database engine."""
-        return create_engine(f"sqlite:///{self.database_path}")
 
     def start(self) -> Engine:
         """Start the database service."""
@@ -52,3 +48,7 @@ class DatabaseService:
             logger.info("Database already exists. Connecting to it...")
 
         return self._create_new_engine_instance()
+
+    def _create_new_engine_instance(self) -> Engine:
+        """Get the database engine."""
+        return create_engine(f"sqlite:///{self.database_path}")
