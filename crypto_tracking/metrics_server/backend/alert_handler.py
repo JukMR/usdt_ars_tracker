@@ -66,6 +66,7 @@ class Alerter:
         self.alerts.append(alert)
 
 
+# Initialize the alerter instance
 alerter_instance = Alerter()
 
 
