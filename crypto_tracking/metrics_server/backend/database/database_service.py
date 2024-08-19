@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy import Engine, create_engine
 
 from crypto_tracking.logging_config import logger
-from crypto_tracking.metrics_server.backend.database.create_database import DatabasePopulator
+from crypto_tracking.metrics_server.backend.database.create_database import DatabaseFromCSVPopulator
 from crypto_tracking.metrics_server.backend.database.sql_models import Base
 
 DB_NAME: str = "crypto_tracking.db"
@@ -26,10 +26,18 @@ class DatabaseService:
         Base.metadata.create_all(engine)
 
         # Populate db with csv file
+        if self.csv_file_exists():
+            logger.info("Populating database with values from CSV file...")
+            DatabaseFromCSVPopulator(project_folder=self.project_folder, db_engine=engine).populate_database()
 
-        DatabasePopulator(project_folder=self.project_folder, db_engine=engine).populate_database()
+        else:
+            logger.info("No CSV file found. Creating empty database...")
 
         return engine
+
+    def csv_file_exists(self) -> bool:
+        """Check if the CSV file exists."""
+        return (self.project_folder / "data" / "exchange_rates.csv").exists()
 
     def _get_database(self) -> Engine:
         """Get the database engine."""

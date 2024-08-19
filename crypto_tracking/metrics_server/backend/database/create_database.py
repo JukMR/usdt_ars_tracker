@@ -8,7 +8,7 @@ from crypto_tracking.metrics_server.backend.database.sql_models import Entry
 from crypto_tracking.metrics_server.backend.values_model import Values
 
 
-class DatabasePopulator:
+class DatabaseFromCSVPopulator:
     """Populate the database using the values from the CSV file"""
 
     def __init__(self, project_folder: Path, db_engine: Engine) -> None:
