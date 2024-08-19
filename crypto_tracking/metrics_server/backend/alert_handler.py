@@ -3,6 +3,9 @@ from enum import Enum
 
 from flask import Response, jsonify
 
+from crypto_tracking.logging_config import logger
+from crypto_tracking.metrics_server.backend.notifiers.telegram import send_bot_alert
+
 
 class Operators(Enum):
     """The operators to use for the alert"""
@@ -46,11 +49,13 @@ class Alert:
     def send_alert(self) -> None:
         match self.alert_type:
             case Notifier.EMAIL:
-                print(f"Sending email alert for {self.currency} {self.operator} {self.value}")
+                logger.info(f"Sending email alert for {self.currency} {self.operator} {self.value}")
             case Notifier.TELEGRAM:
-                print(f"Sending telegram alert for {self.currency} {self.operator} {self.value}")
+                logger.info(f"Sending telegram alert for {self.currency} {self.operator} {self.value}")
+                send_bot_alert(msg="Alert triggered")
+
             case _:
-                print(f"Unknown alert type: {self.alert_type}")
+                logger.info(f"Unknown alert type: {self.alert_type}")
 
 
 class Alerter:
