@@ -22,7 +22,7 @@ class DatabaseService:
     def _create_database(self) -> Engine:
         """Create the database and tables"""
 
-        engine = self._get_database()
+        engine = self._create_new_engine_instance()
         Base.metadata.create_all(engine)
 
         # Populate db with csv file
@@ -39,7 +39,7 @@ class DatabaseService:
         """Check if the CSV file exists."""
         return (self.project_folder / "data" / "exchange_rates.csv").exists()
 
-    def _get_database(self) -> Engine:
+    def _create_new_engine_instance(self) -> Engine:
         """Get the database engine."""
         return create_engine(f"sqlite:///{self.database_path}")
 
@@ -51,4 +51,4 @@ class DatabaseService:
         else:
             logger.info("Database already exists. Connecting to it...")
 
-        return self._get_database()
+        return self._create_new_engine_instance()
