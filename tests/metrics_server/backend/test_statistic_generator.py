@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from sqlalchemy import create_engine
 
-from crypto_tracking.metrics_server.backend.statistics_generator import IntervalTypes, _get_min_max_interval
+from crypto_tracking.metrics_server.backend.statistics_generator import GetMinMaxValues
 
 
 class TestStatisticsGenerator(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestStatisticsGenerator(unittest.TestCase):
         db_engine_mock.connect.return_value.__enter__.return_value = connection_mock
 
         # Call the function with the mocked objects
-        result = _get_min_max_interval(db_engine_mock, IntervalTypes.DAILY)
+        result = GetMinMaxValues(db_engine=db_engine_mock).get_min_max_daily()
 
         # Assert the result
         self.assertEqual(result, (10, 100))

@@ -3,7 +3,7 @@ from pathlib import Path
 from flask import Flask, Response, current_app, jsonify, request
 from sqlalchemy import Engine, text
 
-from crypto_tracking.metrics_server.backend.alert_handler import AlertThresholdSetter
+from crypto_tracking.metrics_server.backend.alert_handler import AlertThresholdSetter, alerter_instance
 from crypto_tracking.metrics_server.backend.database.database_service import DatabaseService
 from crypto_tracking.metrics_server.backend.values_model import Values
 
@@ -43,7 +43,7 @@ def set_alert_thresholds() -> Response:
     if data is None:
         return jsonify({"error": "No data provided"})
 
-    return AlertThresholdSetter(data).set_alert()
+    return AlertThresholdSetter(data=data, alerter=alerter_instance).set_alert()
 
 
 def run_backend(db_engine: Engine) -> None:
