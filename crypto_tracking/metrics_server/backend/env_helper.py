@@ -10,8 +10,10 @@ class EnvHelper:
     """Class to get environment variables."""
 
     def __init__(self) -> None:
-        self.project_folder: Path = Path(__file__).resolve().parents[3]
-        assert self.project_folder.name == "crypto_tracking", "Project folder not found"
+        self.project_folder: Path = Path(__file__).resolve().parents[2]
+        assert (
+            self.project_folder.name == "crypto_tracking"
+        ), f"Project folder not found. Current project folder is: {self.project_folder}"
 
     def get_env_var(self, name: str) -> str:
         """Get the environment variable or load it from the .env file if it's not found."""

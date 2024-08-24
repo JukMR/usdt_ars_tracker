@@ -15,5 +15,8 @@ class DatabaseSession:
         return self.session
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self.session is None:
+            raise ValueError("Session is not initialized")
+
         self.session.commit()
         self.session.close()

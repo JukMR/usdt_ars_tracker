@@ -9,6 +9,8 @@ from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import Notifi
 
 
 class TelegramNotifier(NotifierAbs):
+    """Implementation of the NotifierAbs class for sending alert to Telegram group."""
+
     def send_alert(self, msg: str) -> None:
         """Send an alert to the Telegram bot with the differences between the old and new data."""
 
