@@ -27,4 +27,5 @@ class EnvHelper:
 
             raise AssertionError(f"Environment variable {name} not found in env nor in .env file")
 
+        logger.info("Environment variable %s loaded from environment", name)
         return variable
