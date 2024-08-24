@@ -1,10 +1,9 @@
-from dataclasses import dataclass
 from enum import Enum
 
 from flask import Response, jsonify
 
 from crypto_tracking.logging_config import logger
-from crypto_tracking.metrics_server.backend.notifiers.telegram import send_bot_alert
+from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import NotifierAbs
 
 
 class Operators(Enum):
@@ -17,19 +16,23 @@ class Operators(Enum):
     GREATER_THAN_OR_EQUAL = ">="
 
 
-class Notifier(Enum):
-    """The type of notifier to use for the alert"""
-
-    EMAIL = "email"
-    TELEGRAM = "telegram"
-
-
-@dataclass
 class Alert:
-    currency: str
-    value: float
-    operator: Operators
-    alert_type: Notifier
+    def __init__(self, currency: str, value: float, operator: Operators) -> None:
+        self.currency: str = currency
+        self.value: float = value
+        self.operator: Operators = operator
+        self.alert_notifiers: list[NotifierAbs] | None
+
+    def add_notifier(self, notifier: NotifierAbs) -> None:
+        if self.alert_notifiers is None:
+            self.alert_notifiers = []
+        self.alert_notifiers.append(notifier)
+        logger.info("Notifier %s added to alert", notifier)
+
+    def remove_notifier(self, notifier: NotifierAbs) -> None:
+        if self.alert_notifiers is not None:
+            self.alert_notifiers.remove(notifier)
+            logger.info("Notifier %s removed from alert", notifier)
 
     def check(self, data: dict) -> bool:
         match self.operator:
@@ -47,15 +50,13 @@ class Alert:
                 return False
 
     def send_alert(self) -> None:
-        match self.alert_type:
-            case Notifier.EMAIL:
-                logger.info(f"Sending email alert for {self.currency} {self.operator} {self.value}")
-            case Notifier.TELEGRAM:
-                logger.info(f"Sending telegram alert for {self.currency} {self.operator} {self.value}")
-                send_bot_alert(msg="Alert triggered")
+        if self.alert_notifiers is None:
+            logger.error("No notifiers added to alert")
+            return
 
-            case _:
-                logger.info(f"Unknown alert type: {self.alert_type}")
+        for notifier in self.alert_notifiers:
+            notifier.send_alert(msg=f"Alert: {self.currency} value is {self.value}")
+            logger.info("Alert sent to %s", notifier)
 
 
 class Alerter:
@@ -108,9 +109,9 @@ class AlertThresholdSetter:
     def set_minimum_threshold(self, min_num: str) -> None:
         """Set the minimum threshold for the alert"""
         min_num_float = float(min_num)
-        self.alerter.add_alert(Alert("USDT", min_num_float, Operators.LESS_THAN, Notifier.EMAIL))
+        self.alerter.add_alert(Alert(currency="USDT", value=min_num_float, operator=Operators.LESS_THAN))
 
     def set_maximum_threshold(self, max_num: str) -> None:
         """Set the maximum threshold for the alert"""
         max_num_float = float(max_num)
-        self.alerter.add_alert(Alert("USDT", max_num_float, Operators.GREATER_THAN, Notifier.EMAIL))
+        self.alerter.add_alert(Alert(currency="USDT", value=max_num_float, operator=Operators.GREATER_THAN))
