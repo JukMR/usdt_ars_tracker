@@ -21,9 +21,7 @@ def _get_db_engine():
 
 
 def read_latest_value() -> Values:
-    # This function should read the latest value from the database
-    # and return it as a Values object
-
+    """Read the latest value from the database"""
     db_engine = _get_db_engine()
     with db_engine.connect() as connection:
         results = connection.execute(text("SELECT * FROM entries ORDER BY datetime DESC LIMIT 1"))

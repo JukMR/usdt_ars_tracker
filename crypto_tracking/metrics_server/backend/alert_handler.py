@@ -4,6 +4,7 @@ from flask import Response, jsonify
 
 from crypto_tracking.logging_config import logger
 from crypto_tracking.metrics_server.backend import notifiers
+from crypto_tracking.metrics_server.backend.backend_main import read_latest_value
 from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import NotifierAbs
 from crypto_tracking.metrics_server.backend.values_model import Values
 
@@ -64,9 +65,15 @@ class Alert:
             return
 
         for notifier in self.alert_notifiers:
-            # TODO: fix this, shouldn't print threshold but current price
-            # Also we need to check if it is buy or sell
-            notifier.send_alert(msg=f"Alert: {self.currency} value is {self.threshold}")
+            current_value: Values = read_latest_value()
+
+            current_value_float: float = (
+                current_value.buy if self.currency_type == CurrencyType.BUY else current_value.sell
+            )
+
+            notifier.send_alert(
+                msg=f"Alert: {self.currency} for {self.currency_type} and value is {current_value_float}"
+            )
             logger.info("Alert sent to %s", notifier)
 
 
