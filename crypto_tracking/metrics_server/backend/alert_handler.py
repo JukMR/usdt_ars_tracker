@@ -79,7 +79,7 @@ class Alert:
         """Convert the alert to a dict"""
         return {
             "currency": self.currency,
-            "currency_type": self.currency_type.value,
+            "currency_type": self.currency_type.name,
             "threshold": self.threshold,
             "operator": self.operator.value,
             "alert_notifiers": [str(notifier.__class__.__name__) for notifier in self.alert_notifiers],

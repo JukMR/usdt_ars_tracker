@@ -52,10 +52,16 @@ def set_alert_thresholds() -> Response:
             return jsonify({"error": "Invalid currency_type"})
 
     # Use telegram notifiers as default
-    notifiers: list[NotifierAbs] = [TelegramNotifier()]
+    notifiers: list[NotifierAbs] = set_notifiers()
+
     return AlertThresholdSetter(
         data=data, currency_type=currency_type, alerter=alerter_instance, notifiers_list=notifiers
     ).set_alert()
+
+
+def set_notifiers() -> list[NotifierAbs]:
+    """Set the notifiers to use"""
+    return [TelegramNotifier()]
 
 
 @app.route("/api/alerts", methods=["GET"])
@@ -104,6 +110,7 @@ def check_alerts() -> NoReturn:
 
 
 def main() -> None:
+    """Run the backend server"""
     project_folder: Path = Path(__file__).resolve().parent.parent.parent
     assert project_folder.name == "crypto_tracking", "Project folder is not named 'crypto_tracking'"
 

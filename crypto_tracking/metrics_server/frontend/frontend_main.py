@@ -3,8 +3,6 @@ from typing import Final
 import requests
 from flask import Flask, Response, jsonify, render_template, request
 
-from crypto_tracking.metrics_server.backend.alert_handler import Alert
-
 app = Flask(__name__)
 
 BACKEND_LOCAL_URL: Final[str] = "http://localhost:5001"
@@ -39,11 +37,11 @@ def set_threshold() -> str:
             return "Invalid request method"
 
 
-def get_current_alerts() -> list[Alert]:
+def get_current_alerts() -> list[dict]:
     response = requests.get(BACKEND_LOCAL_URL + "/api/alerts", timeout=60)
     response.raise_for_status()
-    alerts: list[dict] = response.json()["data"]
-    alert_with_id: list[dict] = [{"id": i, **alert} for i, alert in enumerate(alerts)]
+    alerts_dict: list[dict] = response.json()["data"]
+    alert_with_id: list[dict] = [{"id": i, **alert} for i, alert in enumerate(alerts_dict)]
 
     return alert_with_id
 
@@ -66,7 +64,7 @@ def delete_alert(alert_id: int) -> Response:
 def alerts() -> str:
     match request.method:
         case "GET":
-            current_alerts: list[Alert] = get_current_alerts()
+            current_alerts: list[dict] = get_current_alerts()
             return render_template("alerts.html", alerts=current_alerts)
 
         case "POST":

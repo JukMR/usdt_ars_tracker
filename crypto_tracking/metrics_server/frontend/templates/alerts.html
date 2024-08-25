@@ -3,25 +3,61 @@
 
 <head>
   <title> List of alerts</title>
+  <style>
+    table {
+      width: 80%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 4px;
+    }
+
+    th {
+      background-color: #f2f2f2;
+      text-align: left;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+
+    tr:hover {
+      background-color: #ddd;
+    }
+
+    .delete-button {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+  </style>
 </head>
 
 <body>
-  # Add the alerts html here
   <h1>Alerts</h1>
   <table>
     <tr>
-      <th>Symbol</th>
-      <th>Price</th>
-      <th>Threshold</th>
-      <th>Alert Type</th>
+      <th> Currency </th>
+      <th> Currency_type </th>
+      <th> Threshold </th>
+      <th> Type </th>
+      <th> Notifiers </th>
+      <th> Delete alert </th>
     </tr>
     {% for alert in alerts %}
     <tr>
       <td>{{ alert.currency }}</td>
       <td>{{ alert.currency_type }}</td>
       <td>{{ alert.threshold }}</td>
+      <td>{{ alert.operator }}</td>
       <td>{{ alert.alert_notifier }}</td>
-      <button onclick="deleteAlert('{{ alert.id }}')">Delete</button>
+      <td>
+        <button class='delete=button' onclick="deleteAlert('{{ alert.id }}')">Delete</button>
+      </td>
     </tr>
 
     {% endfor %}
