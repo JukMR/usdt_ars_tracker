@@ -21,8 +21,53 @@
       <td>{{ alert.currency_type }}</td>
       <td>{{ alert.threshold }}</td>
       <td>{{ alert.alert_notifier }}</td>
+      <button onclick="deleteAlert('{{ alert.id }}')">Delete</button>
     </tr>
+
     {% endfor %}
+
+  </table>
+
+  <button onclick="deleteAllAlerts()">Delete all alerts</button>
+
+  <script>
+    function deleteAllAlerts() {
+      fetch('/delete/alerts', {
+        method: 'DELETE'
+      })
+        .then(response => {
+          if (response.ok) {
+            alert('All alerts deleted successfully.');
+            // Refresh page
+            window.location.reload();
+          } else {
+            alert('Failed to delete alerts.');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred while deleting alerts.');
+        });
+    }
+
+    function deleteAlert(id) {
+      fetch('/delete/alert/' + id, {
+        method: 'DELETE'
+      })
+        .then(response => {
+          if (response.ok) {
+            alert('Alert deleted successfully.');
+            window.location.reload();
+          } else {
+            alert('Failed to delete alert.');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred while deleting alert.');
+        });
+    }
+  </script>
 
 </body>
 

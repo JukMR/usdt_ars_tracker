@@ -65,6 +65,24 @@ def get_current_alerts() -> Response:
     return jsonify({"data": [alert.to_json() for alert in alerts]})
 
 
+@app.route("/delete/alerts", methods=["DELETE"])
+def delete_all_alerts() -> Response:
+    """Delete all alerts"""
+    alerter_instance.delete_all_alerts()
+    return jsonify({"data": "Alerts deleted successfully!"})
+
+
+@app.route("/delete/alert/<int:alert_id>", methods=["DELETE"])
+def delete_alert(alert_id: int) -> Response:
+    """Delete an alert"""
+    response_status: bool = alerter_instance.delete_alert(alert_id)
+
+    if response_status:
+        return jsonify({"data": "Alert deleted successfully!"})
+
+    return jsonify({"error": "Alert not found"})
+
+
 def run_backend(db_engine: Engine) -> None:
     app.config["DB_ENGINE"] = db_engine
 

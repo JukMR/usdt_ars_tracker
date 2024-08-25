@@ -88,21 +88,42 @@ class Alert:
 
 class Alerter:
     def __init__(self) -> None:
-        self.alerts: list[Alert] = []
+        self._alerts: list[Alert] = []
 
     def check_alerts(self, data: Values) -> None:
-        for alert in self.alerts:
+        for alert in self._alerts:
             if alert.check(data):
                 alert.send_alert()
 
     def add_alert(self, alert: Alert, notifiers: list[NotifierAbs]) -> None:
         for notifier in notifiers:
             alert.add_notifier(notifier)
-        self.alerts.append(alert)
+        self._alerts.append(alert)
 
     def get_alerts(self) -> list[Alert]:
         """Get the current alerts as a list of dicts"""
-        return self.alerts
+        return self._alerts
+
+    def get_alert_by_id(self, alert_id: int) -> Alert | None:
+        """Get an alert by its id, which is the index of the alert in the list"""
+        if alert := self._alerts[alert_id]:
+            return alert
+
+        logger.error("Alert not found for id %s", alert_id)
+        return None
+
+    def delete_alert(self, alert_id: int) -> bool:
+        """Delete an alert by its id"""
+        if alert := self.get_alert_by_id(alert_id):
+            self._alerts.remove(alert)
+            return True
+
+        logger.error("Alert not found")
+        return False
+
+    def delete_all_alerts(self) -> None:
+        """Delete all alerts"""
+        self._alerts = []
 
 
 # Initialize the alerter instance

@@ -1,7 +1,7 @@
 from typing import Final
 
 import requests
-from flask import Flask, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 from crypto_tracking.metrics_server.backend.alert_handler import Alert
 
@@ -43,8 +43,23 @@ def get_current_alerts() -> list[Alert]:
     response = requests.get(BACKEND_LOCAL_URL + "/api/alerts", timeout=60)
     response.raise_for_status()
     alerts: list[dict] = response.json()["data"]
-    print(alerts)
-    return alerts
+    alert_with_id: list[dict] = [{"id": i, **alert} for i, alert in enumerate(alerts)]
+
+    return alert_with_id
+
+
+@app.route("/delete/alerts", methods=["DELETE"])
+def delete_alerts() -> Response:
+    response = requests.delete(BACKEND_LOCAL_URL + "/delete/alerts", timeout=60)
+    response.raise_for_status()
+    return jsonify(response.json())
+
+
+@app.route("/delete/alert/<int:alert_id>", methods=["DELETE"])
+def delete_alert(alert_id: int) -> Response:
+    response = requests.delete(BACKEND_LOCAL_URL + f"/delete/alert/{alert_id}", timeout=60)
+    response.raise_for_status()
+    return jsonify(response.json())
 
 
 @app.route("/alerts", methods=["GET", "POST"])
@@ -52,7 +67,6 @@ def alerts() -> str:
     match request.method:
         case "GET":
             current_alerts: list[Alert] = get_current_alerts()
-
             return render_template("alerts.html", alerts=current_alerts)
 
         case "POST":
