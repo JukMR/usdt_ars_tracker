@@ -71,7 +71,7 @@ class Alert:
             )
 
             notifier.send_alert(
-                msg=f"Alert: {self.currency} for {self.currency_type.value} and value is {current_value_float}"
+                msg=f"Alert: {self.currency} for {self.currency_type.name} and value is {current_value_float}"
             )
             logger.info("Alert sent to %s", notifier)
 
