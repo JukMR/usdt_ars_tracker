@@ -3,8 +3,7 @@ from enum import Enum, auto
 from flask import Response, jsonify
 
 from crypto_tracking.logging_config import logger
-from crypto_tracking.metrics_server.backend import notifiers
-from crypto_tracking.metrics_server.backend.backend_main import read_latest_value
+from crypto_tracking.metrics_server.backend.database_utils import read_latest_value
 from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import NotifierAbs
 from crypto_tracking.metrics_server.backend.values_model import Values
 
@@ -72,9 +71,19 @@ class Alert:
             )
 
             notifier.send_alert(
-                msg=f"Alert: {self.currency} for {self.currency_type} and value is {current_value_float}"
+                msg=f"Alert: {self.currency} for {self.currency_type.value} and value is {current_value_float}"
             )
             logger.info("Alert sent to %s", notifier)
+
+    def to_json(self) -> dict:
+        """Convert the alert to a dict"""
+        return {
+            "currency": self.currency,
+            "currency_type": self.currency_type.value,
+            "threshold": self.threshold,
+            "operator": self.operator.value,
+            "alert_notifiers": [str(notifier.__class__.__name__) for notifier in self.alert_notifiers],
+        }
 
 
 class Alerter:
@@ -90,6 +99,10 @@ class Alerter:
         for notifier in notifiers:
             alert.add_notifier(notifier)
         self.alerts.append(alert)
+
+    def get_alerts(self) -> list[Alert]:
+        """Get the current alerts as a list of dicts"""
+        return self.alerts
 
 
 # Initialize the alerter instance

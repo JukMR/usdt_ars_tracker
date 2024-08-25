@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title> List of alerts</title>
+</head>
+
+<body>
+  # Add the alerts html here
+  <h1>Alerts</h1>
+  <table>
+    <tr>
+      <th>Symbol</th>
+      <th>Price</th>
+      <th>Threshold</th>
+      <th>Alert Type</th>
+    </tr>
+    {% for alert in alerts %}
+    <tr>
+      <td>{{ alert.currency }}</td>
+      <td>{{ alert.currency_type }}</td>
+      <td>{{ alert.threshold }}</td>
+      <td>{{ alert.alert_notifier }}</td>
+    </tr>
+    {% endfor %}
+
+</body>
+
+</html>

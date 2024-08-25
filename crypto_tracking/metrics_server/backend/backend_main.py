@@ -3,33 +3,22 @@ from pathlib import Path
 from threading import Thread
 from typing import NoReturn
 
-from flask import Flask, Response, jsonify, request
-from sqlalchemy import Engine, text
+from flask import Response, jsonify, request
+from sqlalchemy import Engine
 
 from crypto_tracking.logging_config import logger
-from crypto_tracking.metrics_server.backend.alert_handler import AlertThresholdSetter, CurrencyType, alerter_instance
+from crypto_tracking.metrics_server.backend.alert_handler import (
+    Alert,
+    AlertThresholdSetter,
+    CurrencyType,
+    alerter_instance,
+)
+from crypto_tracking.metrics_server.backend.backend_flask_app import app
 from crypto_tracking.metrics_server.backend.database.database_service import DatabaseService
+from crypto_tracking.metrics_server.backend.database_utils import read_latest_value
 from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import NotifierAbs
 from crypto_tracking.metrics_server.backend.notifiers.telegram_notifier import TelegramNotifier
 from crypto_tracking.metrics_server.backend.values_model import Values
-
-app = Flask(__name__)
-
-
-def _get_db_engine():
-    return app.config["DB_ENGINE"]
-
-
-def read_latest_value() -> Values:
-    """Read the latest value from the database"""
-    db_engine = _get_db_engine()
-    with db_engine.connect() as connection:
-        results = connection.execute(text("SELECT * FROM entries ORDER BY datetime DESC LIMIT 1"))
-        for row in results:
-            timestamp, source, buy, sell = row
-            return Values(timestamp=timestamp, source=source, buy=buy, sell=sell)
-
-    raise ValueError("No values found in the database")
 
 
 @app.route("/metrics", methods=["GET"])
@@ -67,6 +56,13 @@ def set_alert_thresholds() -> Response:
     return AlertThresholdSetter(
         data=data, currency_type=currency_type, alerter=alerter_instance, notifiers_list=notifiers
     ).set_alert()
+
+
+@app.route("/api/alerts", methods=["GET"])
+def get_current_alerts() -> Response:
+    """Get the current alerts"""
+    alerts: list[Alert] = alerter_instance.get_alerts()
+    return jsonify({"data": [alert.to_json() for alert in alerts]})
 
 
 def run_backend(db_engine: Engine) -> None:
