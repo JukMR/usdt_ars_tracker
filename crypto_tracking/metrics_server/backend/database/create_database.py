@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import pandas as pd
+import csv
 from sqlalchemy import Engine
 
 from crypto_tracking.metrics_server.backend.database.database_session import DatabaseSession
@@ -36,8 +36,19 @@ class DatabaseFromCSVPopulator:
 
         # Load data from CSV file
 
-        df = pd.read_csv(exchange_rate_file)
-        values: list[Values] = df.to_dict(orient="records")
+        values: list[Values] = []
+
+        with open(exchange_rate_file, "w", newline="") as f:
+            reader: csv.DictReader = csv.DictReader(f)
+            for row in reader:
+                values.append(
+                    Values(
+                        sell=row.get("sell"),
+                        buy=row.get("buy"),
+                        timestamp=row.get("timestamp"),
+                        source=row.get("source"),
+                    )
+                )
 
         values = [Values.model_validate(value) for value in values]
 
