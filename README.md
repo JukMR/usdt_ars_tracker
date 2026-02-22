@@ -111,6 +111,7 @@ python -m crypto_tracking.api_poller.poller
 ```
 
 This starts the continuous polling service that:
+
 - Fetches USDT/ARS rates from Buenbit every 60 seconds
 - Stores data in the SQLite database
 
@@ -121,6 +122,7 @@ python -m crypto_tracking.metrics_server.backend.backend_main
 ```
 
 The backend server runs on `http://localhost:5001` and provides:
+
 - Alert checking and notifications
 - REST API endpoints
 
@@ -131,6 +133,7 @@ python -m crypto_tracking.metrics_server.frontend.frontend_main
 ```
 
 The frontend runs on `http://localhost:5000` and provides:
+
 - Alert threshold configuration
 - Alert management interface
 
@@ -169,6 +172,7 @@ curl -X POST http://localhost:5001/api/numbers \
 The application uses SQLite with the following schema:
 
 **Table: `entries`**
+
 | Column | Type | Description |
 |--------|------|-------------|
 | datetime | DateTime | Primary key, timestamp of entry |
@@ -181,6 +185,7 @@ Database file: `crypto_tracking.db` (created automatically in project root)
 ## Logging
 
 Logs are stored in `logs/` directory with separate files for each log level:
+
 - `debug/` - Debug messages
 - `info/` - Informational messages
 - `warning/` - Warning messages
@@ -199,6 +204,7 @@ pytest
 ### Code Quality
 
 This project uses:
+
 - **Ruff** for linting and formatting
 - **Black** for code formatting (compatible with Ruff)
 - **MyPy** for type checking
@@ -265,6 +271,7 @@ To add a new notification channel:
 3. Register the notifier in `backend_main.py::set_notifiers()`
 
 Example:
+
 ```python
 from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import NotifierAbs
 
@@ -277,15 +284,18 @@ class CustomNotifier(NotifierAbs):
 ## Troubleshooting
 
 ### Database Not Found
+
 - Ensure the API poller has run at least once to create the database
 - Check that `crypto_tracking.db` exists in the project root
 
 ### Telegram Notifications Not Working
+
 - Verify `BOT_TOKEN` and `CHAT_ID` in `.env`
 - Ensure the bot is added to the target chat/group
 - Check bot permissions in the group
 
 ### Port Already in Use
+
 - Backend (5001): `lsof -i :5001` to find process
 - Frontend (5000): `lsof -i :5000` to find process
 - Modify ports in `backend_main.py` and `frontend_main.py`
