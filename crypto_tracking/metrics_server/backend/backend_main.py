@@ -18,6 +18,7 @@ from crypto_tracking.metrics_server.backend.database.database_service import Dat
 from crypto_tracking.metrics_server.backend.database_utils import read_latest_value
 from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import NotifierAbs
 from crypto_tracking.metrics_server.backend.notifiers.telegram_notifier import TelegramNotifier
+from crypto_tracking.metrics_server.backend.notifiers.email_notifier import EmailNotifier
 from crypto_tracking.metrics_server.backend.values_model import Values
 
 
@@ -60,8 +61,25 @@ def set_alert_thresholds() -> Response:
 
 
 def set_notifiers() -> list[NotifierAbs]:
-    """Set the notifiers to use"""
-    return [TelegramNotifier()]
+    """Set the notifiers to use. Returns Telegram and Email notifiers if configured."""
+    notifiers: list[NotifierAbs] = []
+
+    try:
+        notifiers.append(TelegramNotifier())
+        logger.info("Telegram notifier initialized")
+    except AssertionError as e:
+        logger.warning("Telegram notifier not configured: %s", e)
+
+    try:
+        notifiers.append(EmailNotifier())
+        logger.info("Email notifier initialized")
+    except AssertionError as e:
+        logger.warning("Email notifier not configured: %s", e)
+
+    if not notifiers:
+        logger.error("No notifiers configured. Alerts will not be sent.")
+
+    return notifiers
 
 
 @app.route("/api/alerts", methods=["GET"])

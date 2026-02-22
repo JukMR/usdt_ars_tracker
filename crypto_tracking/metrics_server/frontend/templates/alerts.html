@@ -54,7 +54,7 @@
       <td>{{ alert.currency_type }}</td>
       <td>{{ alert.threshold }}</td>
       <td>{{ alert.operator }}</td>
-      <td>{{ alert.alert_notifier }}</td>
+      <td>{{ alert.alert_notifiers[0] if alert.alert_notifiers else 'None' }}</td>
       <td>
         <button class='delete=button' onclick="deleteAlert('{{ alert.id }}')">Delete</button>
       </td>

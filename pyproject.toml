@@ -18,6 +18,12 @@ python-telegram-bot = "^21.4"
 python-dotenv = "^1.0.1"
 
 
+[tool.poetry.scripts]
+crypto-poller = "crypto_tracking.api_poller.poller:main"
+crypto-backend = "crypto_tracking.metrics_server.backend.backend_main:main"
+crypto-frontend = "crypto_tracking.metrics_server.frontend.frontend_main:main"
+
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

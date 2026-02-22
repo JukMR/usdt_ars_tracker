@@ -35,21 +35,20 @@ class DatabaseFromCSVPopulator:
         assert exchange_rate_file.exists(), f"Exchange rate file not found: {exchange_rate_file}"
 
         # Load data from CSV file
+        values: list[dict[str, str]] = []
 
-        values: list[Values] = []
-
-        with open(exchange_rate_file, "w", newline="") as f:
+        with open(exchange_rate_file, "r", newline="") as f:
             reader: csv.DictReader = csv.DictReader(f)
             for row in reader:
                 values.append(
-                    Values(
-                        sell=row.get("sell"),
-                        buy=row.get("buy"),
-                        timestamp=row.get("timestamp"),
-                        source=row.get("source"),
-                    )
+                    {
+                        "sell": row["sell"],
+                        "buy": row["buy"],
+                        "timestamp": row["timestamp"],
+                        "source": row["source"],
+                    }
                 )
 
-        values = [Values.model_validate(value) for value in values]
+        typed_values: list[Values] = [Values.model_validate(value) for value in values]
 
-        return values
+        return typed_values

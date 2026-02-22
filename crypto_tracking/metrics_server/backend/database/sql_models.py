@@ -1,12 +1,12 @@
 # Create sql model
 
 from sqlalchemy import Column, DateTime, Float, String
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
 
-class Entry(Base):
+class Entry(Base):  # type: ignore[valid-type, misc]
     __tablename__ = "entries"
     datetime = Column(DateTime, primary_key=True)
     source = Column(String, nullable=False)

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -14,5 +15,7 @@ class Values(BaseModel):
     # Transform custom datetime into datetime
     @field_validator("timestamp", mode="before")
     @classmethod
-    def transform(cls, raw: str) -> datetime:
+    def transform(cls, raw: Any) -> datetime:
+        if isinstance(raw, datetime):
+            return raw
         return datetime.strptime(raw, "%Y-%m-%d %H:%M:%S.%f")
