@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import UTC, datetime
 
-import requests  # type: ignore[import-untyped]
+import requests
 
 from crypto_tracking.domain import Quote, utcnow
 from crypto_tracking.providers.base import PriceProvider

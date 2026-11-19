@@ -32,35 +32,35 @@ and sends alerts to Telegram, email or any channel you add.
 
 ## Quick start
 
+Install [uv](https://docs.astral.sh/uv/) if you do not have it:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then clone the project and let uv create the virtual environment and install
+the locked dependencies:
+
 ```bash
 git clone <repository-url>
 cd crypto_tracking
-
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 
 # Optional: customise providers, ports and intervals.
 cp config.example.toml config.toml
 
 # Fetch one round and evaluate alerts.
-python -m crypto_tracking.cli poll --once
+uv run crypto-track poll --once
 
 # Poll continuously, evaluate alerts and serve the dashboard.
-python -m crypto_tracking.cli serve
+uv run crypto-track serve
 ```
 
 Open <http://127.0.0.1:5001/>.
 
-With Poetry (the package exposes a `crypto-track` script):
-
-```bash
-poetry install
-poetry run crypto-track serve
-```
-
-The examples below use `crypto-track`; substitute
-`python -m crypto_tracking.cli` if the script is not installed.
+`uv run` executes the `crypto-track` script inside the project environment
+without activating it. If you prefer an activated shell, use `source
+.venv/bin/activate` after `uv sync` and then call `crypto-track` directly.
 
 ## How it works
 
@@ -293,6 +293,9 @@ The dashboard at `/` includes:
 
 ## CLI
 
+Run these with `uv run` (for example `uv run crypto-track serve`) or after
+activating the environment with `source .venv/bin/activate`.
+
 ```bash
 crypto-track serve                 # poller + alert engine + dashboard
 crypto-track serve --no-poller     # dashboard only, from local data
@@ -363,21 +366,26 @@ SQLite by default at `data/crypto_tracking.db` (`data/` is git-ignored).
 Stop the poller and keep exploring what you already collected:
 
 ```bash
-crypto-track serve --no-poller
+uv run crypto-track serve --no-poller
 ```
 
 The dashboard, chart, alerts and CSV export all read from the local database.
-`crypto-track export-csv history.csv --range all` produces a portable snapshot
-for spreadsheets or notebooks.
+`uv run crypto-track export-csv history.csv --range all` produces a portable
+snapshot for spreadsheets or notebooks.
 
 ## Development
 
 ```bash
-.venv/bin/pytest
-ruff check .
-ruff format .
-.venv/bin/mypy crypto_tracking
+uv sync                  # create/update .venv from uv.lock (includes dev tools)
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy crypto_tracking
 ```
+
+Use `uv add <package>` and `uv remove <package>` to change dependencies; uv
+updates `pyproject.toml` and `uv.lock` together. `uv lock --upgrade` refreshes
+the lock file without changing version constraints.
 
 Tests use temporary SQLite files and fake HTTP sessions/notifiers, so they never
 touch the network or your real database.
@@ -419,7 +427,7 @@ rather than duplicating it.
 
 ## Troubleshooting
 
-- **`No prices yet`** — run `crypto-track poll --once`, or check provider
+- **`No prices yet`** — run `uv run crypto-track poll --once`, or check provider
   warnings in the logs.
 - **Telegram/email warnings** — set the credentials in `.env`; only configured
   channels are registered.

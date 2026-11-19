@@ -181,7 +181,8 @@ def command_init_db(args: argparse.Namespace) -> int:
     context = build_context(settings)
     print(f"Database ready: {settings.database_url}")
     print(
-        f"Prices: {context.prices.count()} | Alerts: {context.alerts.count_alerts()} | Events: {context.alerts.count_events()}"
+        f"Prices: {context.prices.count()} | Alerts: {context.alerts.count_alerts()}"
+        f" | Events: {context.alerts.count_events()}"
     )
     context.database.dispose()
     return 0
@@ -192,7 +193,8 @@ def command_status(args: argparse.Namespace) -> int:
     context = build_context(settings)
     print(f"Database: {settings.database_url}")
     print(
-        f"Prices: {context.prices.count()} | Alerts: {context.alerts.count_alerts()} | Events: {context.alerts.count_events()}"
+        f"Prices: {context.prices.count()} | Alerts: {context.alerts.count_alerts()}"
+        f" | Events: {context.alerts.count_events()}"
     )
     print(f"Providers: {', '.join(provider.name for provider in context.providers) or 'none'}")
     print(f"Notifiers: {', '.join(context.notifiers.channels()) or 'none'}")

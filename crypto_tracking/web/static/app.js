@@ -277,7 +277,7 @@
     const container = $("#price-cards");
     if (!pairs || pairs.length === 0) {
       container.innerHTML =
-        '<div class="empty">No prices yet. Start the poller with <code>crypto-track serve</code> or fetch one round with <code>crypto-track poll --once</code>.</div>';
+        '<div class="empty">No prices yet. Start the poller with <code>uv run crypto-track serve</code> or fetch one round with <code>uv run crypto-track poll --once</code>.</div>';
       return;
     }
 

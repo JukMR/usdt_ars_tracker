@@ -1,6 +1,0 @@
-# Runtime dependencies. For development tools see pyproject.toml / poetry.
-Flask>=3.0,<4
-SQLAlchemy>=2.0,<3
-requests>=2.31,<3
-python-dotenv>=1.0,<2
-gunicorn>=21.2,<24

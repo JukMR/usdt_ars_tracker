@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-import requests  # type: ignore[import-untyped]
+import requests
 
 from crypto_tracking.domain import Notification
 from crypto_tracking.notifiers.base import Notifier, NotifierNotConfigured

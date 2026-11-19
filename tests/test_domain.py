@@ -25,7 +25,7 @@ def test_operator_compare(operator, value, threshold, expected):
 
 
 def test_quote_normalises_values_and_timezone():
-    naive = datetime(2024, 1, 1, 12, 0, 0)  # noqa: DTZ001 - deliberately testing naive handling
+    naive = datetime(2024, 1, 1, 12, 0, 0)
     quote = Quote(asset="btc", quote_currency="usdt", source="test", price=1.0, timestamp=naive)
 
     assert quote.asset == "BTC"
@@ -45,7 +45,7 @@ def test_quote_value_metric():
 
 
 def test_ensure_utc_treats_naive_as_utc():
-    naive = datetime(2024, 1, 1, 12, 0, 0)  # noqa: DTZ001 - deliberately testing naive handling
+    naive = datetime(2024, 1, 1, 12, 0, 0)
     assert ensure_utc(naive).tzinfo == UTC
 
     aware = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone(timedelta(hours=-3)))

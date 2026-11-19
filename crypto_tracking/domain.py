@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 RANGE_DELTAS: dict[str, timedelta | None] = {
@@ -51,7 +51,7 @@ def range_since(range_key: str, now: datetime | None = None) -> datetime | None:
     return ensure_utc(now or utcnow()) - delta
 
 
-class Metric(str, Enum):
+class Metric(StrEnum):
     """The price field an alert is evaluated against."""
 
     PRICE = "price"
@@ -59,7 +59,7 @@ class Metric(str, Enum):
     ASK = "ask"
 
 
-class Operator(str, Enum):
+class Operator(StrEnum):
     """Comparison operators supported by alerts."""
 
     LESS_THAN = "<"
