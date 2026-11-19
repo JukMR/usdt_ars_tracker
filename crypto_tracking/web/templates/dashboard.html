@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crypto Tracker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">◈</div>
+        <div>
+          <h1>Crypto Tracker</h1>
+          <p>Local market watch &amp; alerts</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="status-badge" class="status-badge">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="status-text">Connecting…</span>
+        </span>
+        <span id="last-updated" class="muted small"></span>
+        <button id="pause-button" class="btn ghost" type="button">Pause live</button>
+        <button id="refresh-button" class="btn" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <div id="error-banner" class="banner hidden" role="alert"></div>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Watchlist</h2>
+          <p class="muted">Latest prices across your configured venues.</p>
+        </div>
+        <div id="provider-chips" class="chip-row" aria-label="Active providers"></div>
+      </div>
+      <div id="price-cards" class="card-grid">
+        <div class="empty">Loading prices…</div>
+      </div>
+    </section>
+
+    <section class="panel section" id="chart-section">
+      <div class="panel-head">
+        <div>
+          <h2>Price history</h2>
+          <p id="chart-subtitle" class="muted">Select a pair to inspect its history.</p>
+        </div>
+        <div class="chart-controls">
+          <label class="select-label">
+            <span>Pair</span>
+            <select id="pair-select"></select>
+          </label>
+          <div id="range-buttons" class="segmented" role="group" aria-label="Time range"></div>
+          <a id="tradingview-link" class="btn ghost" href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView ↗</a>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="price-chart" role="img" aria-label="Price history chart"></canvas>
+        <div id="chart-empty" class="chart-empty hidden">No price history for this range yet.</div>
+      </div>
+    </section>
+
+    <div class="two-column">
+      <section class="panel section" id="alerts">
+        <div class="panel-head">
+          <div>
+            <h2>Alerts</h2>
+            <p class="muted">Edge-triggered thresholds with an optional cooldown.</p>
+          </div>
+          <button id="check-button" class="btn ghost" type="button">Check now</button>
+        </div>
+
+        <form id="alert-form" class="alert-form" autocomplete="off">
+          <div class="form-grid">
+            <label>Pair
+              <select id="alert-pair" name="pair" required></select>
+            </label>
+            <label>Metric
+              <select id="alert-metric" name="metric">
+                <option value="price">Price</option>
+                <option value="bid">Bid</option>
+                <option value="ask">Ask</option>
+              </select>
+            </label>
+            <label>Operator
+              <select id="alert-operator" name="operator">
+                <option value=">">Above (&gt;)</option>
+                <option value=">=">At or above (&ge;)</option>
+                <option value="<">Below (&lt;)</option>
+                <option value="<=">At or below (&le;)</option>
+                <option value="=">Equal (=)</option>
+              </select>
+            </label>
+            <label>Threshold
+              <input id="alert-threshold" name="threshold" type="number" step="any" min="0" placeholder="e.g. 70000" required>
+            </label>
+            <label>Source
+              <select id="alert-source" name="source">
+                <option value="">Any source</option>
+              </select>
+            </label>
+            <label>Cooldown (seconds)
+              <input id="alert-cooldown" name="cooldown_seconds" type="number" min="0" step="1" value="3600">
+            </label>
+            <label class="span-2">Label (optional)
+              <input id="alert-label" name="label" type="text" maxlength="200" placeholder="e.g. BTC breakout">
+            </label>
+          </div>
+          <div class="form-row">
+            <div>
+              <span class="field-label">Channels</span>
+              <div id="alert-channels" class="checkbox-row"></div>
+            </div>
+            <label class="checkbox">
+              <input id="alert-repeat" name="repeat" type="checkbox">
+              Repeat while condition holds
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn primary" type="submit">Create alert</button>
+            <button class="btn ghost" type="reset">Clear</button>
+          </div>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>On</th>
+                <th>Condition</th>
+                <th>Channels</th>
+                <th>Cooldown</th>
+                <th>Last fired</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="alerts-body">
+              <tr><td colspan="6" class="empty-cell">No alerts yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel section">
+        <div class="panel-head">
+          <div>
+            <h2>Recent events</h2>
+            <p class="muted">Every trigger, including delivery results.</p>
+          </div>
+          <a class="btn ghost" href="/api/prices/export.csv" download>Export CSV</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Pair</th>
+                <th>Event</th>
+                <th>Deliveries</th>
+              </tr>
+            </thead>
+            <tbody id="events-body">
+              <tr><td colspan="4" class="empty-cell">No events yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script>
+    window.TRACKER_CONFIG = { refreshSeconds: {{ refresh_seconds }} };
+  </script>
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

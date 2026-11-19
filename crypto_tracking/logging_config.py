@@ -1,93 +1,62 @@
-"""Logging configuration for the project."""
+"""Logging setup for the tracker.
 
-from datetime import datetime
-from logging import DEBUG, ERROR, INFO, WARNING, Filter, Formatter, StreamHandler, getLevelName, getLogger
+One rotating log file plus console output. Call :func:`configure_logging` once
+at process start-up (the CLI does this for you).
+"""
+
+from __future__ import annotations
+
+import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-
-def _create_log_folder_if_not_exists(folder: Path) -> Path:
-    folder.mkdir(parents=True, exist_ok=True)
-    return folder
+LOG_FORMAT = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
+LOG_FILE_NAME = "crypto_tracking.log"
 
 
-def _get_log_file_using_date_in_name(log_type: str, project_folder: Path) -> Path:
-    date = datetime.today().strftime("%Y_%m_%d_%H_%M_%S")
-    folder_name = f"logs/{log_type}"
-    folder = _create_log_folder_if_not_exists(project_folder / folder_name)
-    return folder / f"{date}.log"
-
-
-class LogLevelFilter(Filter):
-    def __init__(self, level) -> None:
-        self.level = level
-
-    def filter(self, record) -> bool:
-        return record.levelno == self.level
-
-
-logger = getLogger(__name__)
-
-
-class LazyFileHandler(StreamHandler):
-    """
-    Custom logging handler that lazily opens the log file.
-    The file is only opened when a log record is emitted, preventing the creation of empty log files.
-    """
-
-    def __init__(self, filename, mode="a", encoding=None):
-        self.base_filename = filename
-        self.mode = mode
-        self.encoding = encoding
-        self._file = None
-        StreamHandler.__init__(self)
-
-    def _open_file(self):
-        if self._file is None:
-            self._file = open(self.base_filename, self.mode, encoding=self.encoding)
-        return self._file
-
-    def emit(self, record):
-        self.stream = self._open_file()
-        StreamHandler.emit(self, record)
-
-
-def _set_log_to_file(log_level, project_folder: Path) -> None:
-    log_type = getLevelName(log_level)
-    logfile = _get_log_file_using_date_in_name(log_type, project_folder=project_folder)
-    file_handler = LazyFileHandler(logfile)
-    file_handler.setLevel(log_level)
-    formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    file_handler.setFormatter(formatter)
-    level_filter = LogLevelFilter(log_level)
-    file_handler.addFilter(level_filter)
-    logger.addHandler(file_handler)
-
-
-def _set_log_to_terminal(log_level) -> None:
-    stream_handler = StreamHandler()
-    stream_handler.setLevel(log_level)
-    formatter = Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
-
-
-def configure_logger(
+def configure_logging(
     project_folder: Path,
-    debug: bool = True,
-    info: bool = True,
-    enable_log_to_file=True,
-    enable_log_to_terminal=True,
-) -> None:
-    if debug:
-        logger.setLevel(DEBUG)
-    elif info:
-        logger.setLevel(INFO)
+    level: str = "INFO",
+    *,
+    log_to_file: bool = True,
+    log_to_console: bool = True,
+) -> logging.Logger:
+    """Configure the root logger and return it.
 
-    if enable_log_to_file:
-        _set_log_to_file(ERROR, project_folder=project_folder)
-        _set_log_to_file(WARNING, project_folder=project_folder)
-        _set_log_to_file(INFO, project_folder=project_folder)
-        _set_log_to_file(DEBUG, project_folder=project_folder)
+    Existing handlers are removed so repeated calls (for example in tests or
+    when the Flask reloader is used) do not duplicate log lines.
+    """
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+        handler.close()
 
-    if enable_log_to_terminal:
-        _set_log_to_terminal(DEBUG if debug else INFO)
+    numeric_level = logging.getLevelName(level.upper())
+    if not isinstance(numeric_level, int):
+        numeric_level = logging.INFO
+    root.setLevel(numeric_level)
+
+    formatter = logging.Formatter(LOG_FORMAT)
+
+    if log_to_console:
+        console = logging.StreamHandler()
+        console.setLevel(numeric_level)
+        console.setFormatter(formatter)
+        root.addHandler(console)
+
+    if log_to_file:
+        log_dir = project_folder / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            log_dir / LOG_FILE_NAME,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=5,
+            encoding="utf-8",
+        )
+        file_handler.setLevel(numeric_level)
+        file_handler.setFormatter(formatter)
+        root.addHandler(file_handler)
+
+    # Flask's development server is chatty; keep it at warnings unless debugging.
+    logging.getLogger("werkzeug").setLevel(logging.DEBUG if numeric_level <= logging.DEBUG else logging.WARNING)
+    return root

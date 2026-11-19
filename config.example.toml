@@ -1,0 +1,49 @@
+# Copy this file to config.toml and edit what you need.
+# Every value has a sensible default, so an empty config is valid.
+
+[poller]
+# Seconds between price fetches.
+interval_seconds = 60
+
+[server]
+host = "127.0.0.1"
+port = 5001
+debug = false
+# How often the dashboard refreshes in the browser.
+dashboard_refresh_seconds = 10
+log_level = "INFO"
+
+[alerts]
+# Default cooldown applied to alerts created through the API/dashboard.
+default_cooldown_seconds = 3600
+
+[providers.binance]
+enabled = true
+# Symbols are split into asset/quote automatically (BTCUSDT -> BTC/USDT).
+symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+
+[providers.criptoya]
+enabled = true
+coin = "usdt"
+fiat = "ars"
+# Empty list = every venue criptoya returns. Or pick specific ones, e.g.
+# ["ripio", "letsbit", "fiwind"].
+exchanges = ["ripio"]
+
+[providers.coingecko]
+# Disabled by default; useful as a USD fallback when Binance is unreachable.
+enabled = false
+quote_currency = "USD"
+
+# Uncomment to customise the CoinGecko asset mapping.
+# [providers.coingecko.assets]
+# bitcoin = "BTC"
+# ethereum = "ETH"
+
+[notifiers]
+# Extra notifier classes to load, e.g. "my_project.notifiers:DiscordNotifier".
+# See the README for the Notifier interface.
+plugins = []
+# Channels pre-selected in the dashboard when creating an alert.
+# "log" is always available; add "telegram" and/or "email" once configured.
+default_channels = ["log"]

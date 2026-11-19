@@ -1,309 +1,434 @@
-# USDT/ARS Crypto Tracker
+# Crypto Tracker
 
-A comprehensive solution for tracking USDT/ARS exchange rate fluctuations from Buenbit, with real-time alerts and notifications.
+A local, multi-source cryptocurrency price tracker with a near-live dashboard,
+persistent threshold alerts and pluggable notification channels.
+
+It is built to sit next to TradingView rather than replace it: the dashboard
+gives you a lightweight, offline-friendly view of the pairs and venues *you*
+care about (including USDT/ARS in Argentina), keeps a local history in SQLite,
+and sends alerts to Telegram, email or any channel you add.
 
 ## Features
 
-- **Automated Price Tracking**: Polls the Buenbit API every 60 seconds for USDT/ARS exchange rates
-- **SQLite Database**: Persistent storage of historical price data
-- **Price Alerts**: Set minimum/maximum thresholds for buy and sell prices
-- **Telegram Notifications**: Real-time alerts sent to Telegram when thresholds are breached
-- **Web Interface**: Simple Flask-based UI for managing alerts
-- **REST API**: Backend API for programmatic access to metrics and alert management
-- **Extensible Notifier System**: Abstract notifier pattern for adding custom notification channels
+- **Multiple assets and venues** — track BTC, ETH, SOL, USDT and anything else
+  your providers expose. Quotes are stored as `asset / quote_currency / source`,
+  so the same pair can be compared across exchanges.
+- **Near-live dashboard** — Flask + Chart.js, polling the local API every few
+  seconds. Chart.js is vendored, so the UI also works without internet access.
+- **Min/max threshold alerts** — operators `<`, `<=`, `=`, `>`, `>=` over
+  `price`, `bid` or `ask`. Alerts are edge-triggered, re-arm when the condition
+  becomes false, and support cooldowns plus optional repeating.
+- **Persistent history** — every fetch is written to SQLite. Alert events and
+  per-channel delivery results are kept too, so you can audit what fired and
+  whether it was delivered.
+- **Pluggable notifiers** — built-in `log`, `telegram` and `email` channels,
+  plus dynamic loading of your own classes.
+- **Offline mode** — serve the dashboard from existing local data with
+  `crypto-track serve --no-poller`.
+- **CSV import/export** — bring in legacy `timestamp,source,buy,sell` files or
+  export the full history.
+- **TradingView links** — each pair card links out to TradingView for deeper
+  charting and indicators.
 
-## Architecture
-
-```
-crypto_tracking/
-├── api_poller/          # Service that polls exchange rate API
-│   └── poller.py
-├── metrics_server/      # Flask web application
-│   ├── backend/         # API endpoints, alerts, database logic
-│   │   ├── database/    # SQLAlchemy models and database service
-│   │   └── notifiers/   # Notification implementations (Telegram, Email)
-│   └── frontend/        # Web UI templates and routes
-├── data/                # SQLite database and CSV exports
-└── logs/                # Application logs
-```
-
-### Components
-
-1. **API Poller**: Runs continuously, fetching exchange rates from criptoya.com API
-2. **Backend Server** (Port 5001): Flask API handling alerts, metrics, and database operations
-3. **Frontend Server** (Port 5000): Web interface for setting thresholds and managing alerts
-4. **Database Service**: SQLite with SQLAlchemy ORM for data persistence
-5. **Notifier System**: Pluggable notification system (Telegram, Email)
-
-## Installation
-
-### Prerequisites
-
-- Python 3.11+
-- Poetry (recommended) or pip
-
-### Using Poetry
+## Quick start
 
 ```bash
-# Clone the repository
 git clone <repository-url>
 cd crypto_tracking
 
-# Install dependencies
-poetry install
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-# Activate virtual environment
-poetry shell
+# Optional: customise providers, ports and intervals.
+cp config.example.toml config.toml
+
+# Fetch one round and evaluate alerts.
+python -m crypto_tracking.cli poll --once
+
+# Poll continuously, evaluate alerts and serve the dashboard.
+python -m crypto_tracking.cli serve
 ```
 
-### Using pip
+Open <http://127.0.0.1:5001/>.
+
+With Poetry (the package exposes a `crypto-track` script):
 
 ```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+poetry install
+poetry run crypto-track serve
 ```
+
+The examples below use `crypto-track`; substitute
+`python -m crypto_tracking.cli` if the script is not installed.
+
+## How it works
+
+```
+providers ──► poller ──► SQLite ◄── alert engine ──► notifiers
+                           ▲              │
+                           └──── web/API ─┘
+```
+
+| Layer | Package | Responsibility |
+| --- | --- | --- |
+| Domain | `crypto_tracking/domain.py` | `Quote`, `PriceStats`, `Notification`, metrics, operators, time helpers |
+| Config | `crypto_tracking/config.py` | TOML + environment settings |
+| Providers | `crypto_tracking/providers/` | Binance, Criptoya, CoinGecko; one `fetch()` per source |
+| Storage | `crypto_tracking/storage/` | SQLAlchemy models, database session, repositories |
+| Alerts | `crypto_tracking/alerts/` | Threshold evaluation, cooldown/re-arm logic, message formatting |
+| Notifiers | `crypto_tracking/notifiers/` | Registry, `log`, `telegram`, `email`, plugin loading |
+| Web | `crypto_tracking/web/` | Dashboard template/assets and JSON API |
+| CLI | `crypto_tracking/cli.py` | `serve`, `poll`, `check`, `status`, CSV tools |
+
+Prices enter the system as an immutable `Quote`; nothing provider-specific or
+database-specific leaks into the alert or web layers. That is what makes new
+exchanges and new notification channels small, isolated additions.
 
 ## Configuration
 
-### Environment Variables
+Configuration is resolved in this order (later wins):
 
-Create a `.env` file in the project root for notifications:
+1. built-in defaults,
+2. `config.toml` in the project root (or `--config PATH`),
+3. environment variables, including `.env`.
 
-```env
-# Telegram Notifications (optional)
-BOT_TOKEN=your_telegram_bot_token
-CHAT_ID=your_telegram_chat_id
+Start from `config.example.toml` and `.env.example`.
 
-# Email Notifications (optional)
+```toml
+[poller]
+interval_seconds = 60
+
+[server]
+host = "127.0.0.1"
+port = 5001
+debug = false
+dashboard_refresh_seconds = 10
+log_level = "INFO"
+
+[alerts]
+default_cooldown_seconds = 3600
+
+[providers.binance]
+enabled = true
+symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+
+[providers.criptoya]
+enabled = true
+coin = "usdt"
+fiat = "ars"
+# Empty list = every venue criptoya returns.
+exchanges = ["ripio"]
+
+[providers.coingecko]
+enabled = false
+quote_currency = "USD"
+
+[notifiers]
+plugins = []
+default_channels = ["log"]
+```
+
+### Environment overrides
+
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `CT_CONFIG` | `/etc/ct/config.toml` | Config file path |
+| `CT_DATABASE_URL` | `sqlite:///data/ct.db` | SQLAlchemy database URL |
+| `CT_HOST` / `CT_PORT` | `0.0.0.0` / `5001` | Dashboard bind address |
+| `CT_DEBUG` | `true` | Flask debug mode |
+| `CT_LOG_LEVEL` | `DEBUG` | Logging level |
+| `CT_POLL_INTERVAL` | `30` | Seconds between polls (min 5) |
+| `CT_DASHBOARD_REFRESH_SECONDS` | `5` | Browser refresh interval (min 2) |
+| `CT_BINANCE_ENABLED` | `true` | Enable Binance |
+| `CT_BINANCE_SYMBOLS` | `BTCUSDT,ETHUSDT` | Binance symbols |
+| `CT_CRIPTOYA_ENABLED` | `true` | Enable Criptoya |
+| `CT_CRIPTOYA_COIN` / `CT_CRIPTOYA_FIAT` | `usdt` / `ars` | Criptoya pair |
+| `CT_CRIPTOYA_EXCHANGES` | `ripio,letsbit` | Venues to record |
+| `CT_COINGECKO_ENABLED` | `true` | Enable CoinGecko fallback |
+
+### Notification credentials
+
+Telegram:
+
+```bash
+BOT_TOKEN=123456789:AA...
+CHAT_ID=-100...
+```
+
+Email (SMTP):
+
+```bash
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
-SENDER_EMAIL=your_email@gmail.com
+SMTP_USE_TLS=true
+SENDER_EMAIL=you@example.com
 SENDER_PASSWORD=your_app_password
-RECIPIENT_EMAIL=recipient@example.com
+RECIPIENT_EMAIL=you@example.com,alerts@example.com
 ```
 
-**Getting Telegram Credentials:**
+A channel whose credentials are missing is skipped with a warning at start-up;
+the rest keep working. `log` is always available.
 
-1. Create a bot via [@BotFather](https://t.me/botfather) on Telegram
-2. Get your bot token from BotFather
-3. Add your bot to a group or chat
-4. Get the chat ID by sending a message to the group and visiting:
-   `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+## Providers
 
-**Setting Up Email Notifications:**
+| Provider | Pairs | Notes |
+| --- | --- | --- |
+| `binance` | Any `<ASSET><QUOTE>` symbol, e.g. `BTCUSDT` | Uses `/api/v3/ticker/24hr`; splits symbols into asset/quote automatically |
+| `criptoya` | `USDT/ARS` (configurable coin/fiat) | Aggregates Argentine exchanges; records one source per venue, e.g. `criptoya:ripio` |
+| `coingecko` | `BTC/USD`, `ETH/USD`, … | Disabled by default; useful as a USD fallback |
 
-1. **Gmail**: Use an [App Password](https://support.google.com/accounts/answer/185833)
-2. **Other providers**: Use your SMTP credentials from your email provider
-3. Ensure "Less secure app access" is enabled or use app-specific passwords
+### Adding a provider
 
-## Usage
+Implement `PriceProvider` and register it in
+`crypto_tracking/providers/registry.py`:
 
-### Running the Services
+```python
+from crypto_tracking.domain import Quote
+from crypto_tracking.providers.base import PriceProvider
 
-#### 1. API Poller (Data Collection)
 
-```bash
-python -m crypto_tracking.api_poller.poller
+class MyExchangeProvider(PriceProvider):
+    name = "my-exchange"
+
+    def pairs(self) -> list[tuple[str, str]]:
+        return [("BTC", "USD")]
+
+    def fetch(self) -> list[Quote]:
+        # Fetch data, then normalise it:
+        return [
+            Quote(
+                asset="BTC",
+                quote_currency="USD",
+                source=self.name,
+                price=62_000.0,
+                bid=61_999.0,
+                ask=62_001.0,
+            )
+        ]
 ```
 
-This starts the continuous polling service that:
+The poller calls `fetch()` on every enabled provider; a failure in one provider
+does not stop the others.
 
-- Fetches USDT/ARS rates from Buenbit every 60 seconds
-- Stores data in the SQLite database
+## Alerts
 
-#### 2. Backend Server (API & Alerts)
+Alerts are stored in SQLite and evaluated after every poll (and via
+`POST /api/check`).
 
-```bash
-python -m crypto_tracking.metrics_server.backend.backend_main
-```
+- **Metric**: `price`, `bid` or `ask`.
+- **Operator**: `<`, `<=`, `=`, `>`, `>=`.
+- **Source** (optional): pin the alert to one venue, e.g. `criptoya:ripio`.
+  Leave empty to use the latest quote across all sources for that pair.
+- **Channels**: any registered notifier (`log`, `telegram`, `email`, plugins).
+- **Edge-triggered by default**: fires on the transition from "condition false"
+  to "condition true". Once the condition is false again, the alert re-arms.
+- **Cooldown**: suppresses re-firing during the configured window.
+- **Repeat**: when enabled, fires again every cooldown while the condition
+  stays true.
 
-The backend server runs on `http://localhost:5001` and provides:
+Every trigger creates an `alert_event` row and one `alert_delivery` row per
+channel, including failures and their error messages. Events and deliveries
+remain even if the alert is later deleted.
 
-- Alert checking and notifications
-- REST API endpoints
-
-#### 3. Frontend Server (Web UI)
-
-```bash
-python -m crypto_tracking.metrics_server.frontend.frontend_main
-```
-
-The frontend runs on `http://localhost:5000` and provides:
-
-- Alert threshold configuration
-- Alert management interface
-
-### API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/metrics` | GET | Get current exchange rate |
-| `/api/numbers` | POST | Set alert thresholds |
-| `/api/alerts` | GET | List all active alerts |
-| `/delete/alerts` | DELETE | Delete all alerts |
-| `/delete/alert/<id>` | DELETE | Delete specific alert |
-
-### Setting Alerts via API
+Create alerts from the dashboard or the API:
 
 ```bash
-curl -X POST http://localhost:5001/api/numbers \
-  -H "Content-Type: application/json" \
+curl -X POST http://127.0.0.1:5001/api/alerts \
+  -H 'Content-Type: application/json' \
   -d '{
-    "min_num": 1200,
-    "max_num": 1300,
-    "currency_type": "buy"
+    "asset": "BTC",
+    "quote_currency": "USDT",
+    "metric": "price",
+    "operator": ">",
+    "threshold": 70000,
+    "channels": ["log", "telegram"],
+    "cooldown_seconds": 900,
+    "repeat": false,
+    "label": "BTC breakout"
   }'
 ```
 
-### Setting Alerts via Web UI
+### Custom notifiers
 
-1. Open `http://localhost:5000`
-2. Click "Set Threshold"
-3. Enter minimum and/or maximum values
-4. Select currency type (buy/sell)
-5. Submit to create alerts
+Subclass `Notifier`, implement `send()`, and reference the class in
+`config.toml` using `module:Class` or `module.Class`:
+
+```python
+# my_project/notifiers.py
+from crypto_tracking.domain import Notification
+from crypto_tracking.notifiers.base import Notifier
+
+
+class DiscordNotifier(Notifier):
+    channel = "discord"
+
+    def send(self, notification: Notification) -> None:
+        # Send notification.title / notification.message somewhere.
+        ...
+```
+
+```toml
+[notifiers]
+plugins = ["my_project.notifiers:DiscordNotifier"]
+default_channels = ["log", "discord"]
+```
+
+`send()` should raise on failure. The engine catches the exception, records a
+failed delivery and continues with the remaining channels.
+
+## Dashboard
+
+The dashboard at `/` includes:
+
+- price cards per pair with latest price, bid/ask, window low/high, source and
+  freshness, plus a TradingView link;
+- a Chart.js line chart with one series per source and selectable ranges
+  (`1h`, `6h`, `24h`, `7d`, `30d`, `all`);
+- an alert form (pair, metric, operator, threshold, source, channels, cooldown,
+  repeat, label);
+- an alert table with enable/disable toggles and delete buttons;
+- a recent-events table showing delivery success/failure per channel;
+- manual refresh, pause/resume live polling, and an "Check now" action.
+
+## CLI
+
+```bash
+crypto-track serve                 # poller + alert engine + dashboard
+crypto-track serve --no-poller     # dashboard only, from local data
+crypto-track serve --offline       # alias for --no-poller
+crypto-track serve --host 0.0.0.0 --port 8080 --debug
+crypto-track poll                  # poller only, runs forever
+crypto-track poll --once           # one fetch + one alert evaluation
+crypto-track check                 # evaluate alerts once, print events
+crypto-track status                # database, providers, notifiers, pairs
+crypto-track init-db               # create tables and print counts
+crypto-track import-csv PATH       # import legacy or modern CSV
+crypto-track export-csv PATH       # export history
+```
+
+CSV import accepts both layouts:
+
+```csv
+timestamp,source,buy,sell
+2024-07-28 12:47:18,buenbit,1342.92,1327.0
+```
+
+```csv
+timestamp,asset,quote_currency,source,price,bid,ask,volume
+2024-01-01T00:00:00Z,BTC,USDT,binance,62000,61999,62001,10
+```
+
+Legacy `buy` maps to `ask` and `sell` maps to `bid`; the stored `price` is their
+midpoint when no explicit price column exists.
+
+## HTTP API
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/` | Dashboard |
+| `GET` | `/api/health` | Status, row counts |
+| `GET` | `/api/config` | Pairs, ranges, providers, notifiers |
+| `GET` | `/api/notifiers` | Registered channels and classes |
+| `GET` | `/api/overview?range=24h` | Latest price + stats per pair |
+| `GET` | `/api/prices/latest` | Latest row per source |
+| `GET` | `/api/prices/history?asset=BTC&quote_currency=USDT&range=24h&max_points=800` | Chart points |
+| `GET` | `/api/prices/stats?asset=BTC&quote_currency=USDT&range=24h` | Aggregate stats |
+| `GET` | `/api/prices/export.csv` | CSV download |
+| `GET` | `/api/alerts` | List alerts |
+| `POST` | `/api/alerts` | Create an alert |
+| `PATCH` | `/api/alerts/<id>` | Update fields (including `enabled`) |
+| `DELETE` | `/api/alerts/<id>` | Delete one alert |
+| `DELETE` | `/api/alerts` | Delete all alerts |
+| `GET` | `/api/events?limit=50` | Alert events with deliveries |
+| `POST` | `/api/check` | Evaluate alerts once |
+
+Legacy routes are kept for existing scripts: `GET /metrics`,
+`POST /api/numbers`, `DELETE /delete/alerts`, `DELETE /delete/alert/<id>`, and
+redirects at `/alerts` and `/threshold`.
 
 ## Database
 
-The application uses SQLite with the following schema:
+SQLite by default at `data/crypto_tracking.db` (`data/` is git-ignored).
 
-**Table: `entries`**
+- `prices` — every quote, unique on `(asset, quote_currency, source, timestamp)`.
+- `alerts` — metric, operator, threshold, optional source, channels JSON,
+  cooldown, repeat flag, enabled flag, last state and last trigger time.
+- `alert_events` — snapshot of each trigger; `alert_id` becomes `NULL` if the
+  alert is deleted.
+- `alert_deliveries` — one row per channel attempt, with success/error.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| datetime | DateTime | Primary key, timestamp of entry |
-| source | String | Data source (e.g., "buenbit") |
-| buy | Float | Buy price in ARS |
-| sell | Float | Sell price in ARS |
+## Offline analysis
 
-Database file: `crypto_tracking.db` (created automatically in project root)
+Stop the poller and keep exploring what you already collected:
 
-## Logging
+```bash
+crypto-track serve --no-poller
+```
 
-Logs are stored in `logs/` directory with separate files for each log level:
-
-- `debug/` - Debug messages
-- `info/` - Informational messages
-- `warning/` - Warning messages
-- `error/` - Error messages
-
-Log format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
+The dashboard, chart, alerts and CSV export all read from the local database.
+`crypto-track export-csv history.csv --range all` produces a portable snapshot
+for spreadsheets or notebooks.
 
 ## Development
 
-### Running Tests
-
 ```bash
-pytest
-```
-
-### Code Quality
-
-This project uses:
-
-- **Ruff** for linting and formatting
-- **Black** for code formatting (compatible with Ruff)
-- **MyPy** for type checking
-
-```bash
-# Lint
+.venv/bin/pytest
 ruff check .
-
-# Format
 ruff format .
-
-# Type check
-mypy crypto_tracking/
+.venv/bin/mypy crypto_tracking
 ```
 
-### Project Structure
+Tests use temporary SQLite files and fake HTTP sessions/notifiers, so they never
+touch the network or your real database.
+
+## Project layout
 
 ```
 crypto_tracking/
-├── crypto_tracking/
-│   ├── __init__.py
-│   ├── logging_config.py      # Logging configuration
-│   ├── csv_handler.py         # CSV export utilities
-│   ├── api_poller/
-│   │   └── poller.py          # API polling service
-│   └── metrics_server/
-│       ├── backend/
-│       │   ├── backend_main.py
-│       │   ├── backend_flask_app.py
-│       │   ├── alert_handler.py
-│       │   ├── database_utils.py
-│       │   ├── statistics_generator.py
-│       │   ├── values_model.py
-│       │   ├── env_helper.py
-│       │   ├── database/
-│       │   │   ├── database_service.py
-│       │   │   ├── database_session.py
-│       │   │   ├── sql_models.py
-│       │   │   └── create_database.py
-│       │   └── notifiers/
-│       │       ├── notifier_abs.py
-│       │       ├── telegram_notifier.py
-│       │       └── email_notifier.py
-│       └── frontend/
-│           ├── frontend_main.py
-│           └── templates/
-│               ├── main.html
-│               ├── threshold.html
-│               └── alerts.html
-├── tests/
-├── data/
-├── logs/
-├── pyproject.toml
-├── requirements.txt
-└── README.md
+├── alerts/          # evaluation engine and message formatting
+├── notifiers/       # base class, log/telegram/email, plugin registry
+├── providers/       # Binance, Criptoya, CoinGecko, registry
+├── storage/         # SQLAlchemy models, database, repositories
+├── web/
+│   ├── app.py
+│   ├── templates/dashboard.html
+│   └── static/      # style.css, app.js, vendor/chart.umd.min.js
+├── cli.py
+├── config.py
+├── domain.py
+├── importer.py
+└── poller.py
+tests/
+config.example.toml
+.env.example
 ```
 
-## Adding Custom Notifiers
+## TradingView
 
-To add a new notification channel:
+TradingView does not offer a reliable public historical-price API, so this
+project does not scrape it. Instead:
 
-1. Create a new class in `notifiers/` that inherits from `NotifierAbs`
-2. Implement the `send_alert(msg: str)` method
-3. Register the notifier in `backend_main.py::set_notifiers()`
+- prices come from exchange/public APIs (Binance, Criptoya, CoinGecko);
+- each pair in the dashboard links to its TradingView symbol for indicators,
+  drawings and multi-timeframe analysis;
+- local history is available for offline inspection and CSV export.
 
-Example:
-
-```python
-from crypto_tracking.metrics_server.backend.notifiers.notifier_abs import NotifierAbs
-
-class CustomNotifier(NotifierAbs):
-    def send_alert(self, msg: str) -> None:
-        # Your notification logic here
-        pass
-```
+That keeps the tracker fast and dependable while complementing TradingView
+rather than duplicating it.
 
 ## Troubleshooting
 
-### Database Not Found
-
-- Ensure the API poller has run at least once to create the database
-- Check that `crypto_tracking.db` exists in the project root
-
-### Telegram Notifications Not Working
-
-- Verify `BOT_TOKEN` and `CHAT_ID` in `.env`
-- Ensure the bot is added to the target chat/group
-- Check bot permissions in the group
-
-### Port Already in Use
-
-- Backend (5001): `lsof -i :5001` to find process
-- Frontend (5000): `lsof -i :5000` to find process
-- Modify ports in `backend_main.py` and `frontend_main.py`
+- **`No prices yet`** — run `crypto-track poll --once`, or check provider
+  warnings in the logs.
+- **Telegram/email warnings** — set the credentials in `.env`; only configured
+  channels are registered.
+- **Port already in use** — change `server.port` or pass `--port`.
+- **Criptoya venue missing** — the exchange may have left the aggregator; run
+  with `exchanges = []` to record every venue returned, or choose another name.
+- **Empty chart** — select a pair that has data and a range that covers its
+  timestamps. The dashboard defaults to `24h`.
 
 ## License
 
-MIT License
-
-## Author
-
-Julian Merida <julianmr97@gmail.com>
+MIT

@@ -1,52 +1,49 @@
 [tool.poetry]
 name = "crypto-tracking"
-version = "0.1.2"
-description = "Simple project to keep track of USDT/ARS fluctuations of buenbit"
+version = "0.2.0"
+description = "Local multi-source crypto price tracker with a live dashboard and threshold alerts"
 authors = ["Julian Merida <julianmr97@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-schedule = "^1.2.1"
 requests = "^2.31.0"
 flask = "^3.0.3"
 sqlalchemy = "^2.0.32"
-pydantic = "^2.8.2"
-pytest = "^8.3.2"
-python-telegram-bot = "^21.4"
 python-dotenv = "^1.0.1"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+mypy = "^1.10.0"
+ruff = "^0.9.0"
+types-requests = "^2.32.0"
 
 [tool.poetry.scripts]
-crypto-poller = "crypto_tracking.api_poller.poller:main"
-crypto-backend = "crypto_tracking.metrics_server.backend.backend_main:main"
-crypto-frontend = "crypto_tracking.metrics_server.frontend.frontend_main:main"
-
+crypto-track = "crypto_tracking.cli:main"
+crypto-poller = "crypto_tracking.cli:poll_main"
+crypto-backend = "crypto_tracking.cli:serve_main"
+crypto-frontend = "crypto_tracking.cli:serve_main"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.black]
-line-length = 120
-
 [tool.ruff]
 line-length = 120
 indent-width = 4
+target-version = "py311"
 
 [tool.ruff.format]
-# Like Black, use double quotes for strings.
 quote-style = "double"
-
-# Like Black, indent with spaces, rather than tabs.
 indent-style = "space"
-
-# Like Black, respect magic trailing commas.
 skip-magic-trailing-comma = false
-
-# Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
+[tool.mypy]
+python_version = "3.11"
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+warn_unused_ignores = true
+
 [tool.pytest.ini_options]
-testpaths = 'tests'
+testpaths = ["tests"]
