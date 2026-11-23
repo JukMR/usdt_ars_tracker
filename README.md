@@ -25,9 +25,9 @@ and sends alerts to Telegram, email or any channel you add.
   plus dynamic loading of your own classes.
 - **Offline mode** — serve the dashboard from existing local data with
   `crypto-track serve --no-poller`.
-- **Compact long-term history** — every poll is kept forever in SQLite. Rows are
-  small (~100 bytes) and only three indexes are maintained, so years of data fit
-  comfortably on a Raspberry Pi.
+- **Compact long-term history** — every poll is kept forever in SQLite. With
+  three indexes a row costs ~270 bytes, so polling 8 sources every 60 s grows at
+  roughly **1 GB/year** — decades fit on a Raspberry Pi's disk.
 - **Unattended deployment** — systemd user unit and an idempotent installer
   (`deploy/install.sh`) for desktops and Raspberry Pis, plus a health probe
   (`/health`) for dashboard aggregators such as central-hub.
