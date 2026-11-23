@@ -90,6 +90,38 @@ def test_pairs(repos):
     assert all(row["count"] == 1 for row in pairs)
 
 
+def test_prune_removes_only_old_rows(repos):
+    prices, _ = repos
+    prices.add_quotes(
+        [
+            _quote(price=100, offset_minutes=-120),
+            _quote(price=110, offset_minutes=-60),
+            _quote(price=120, offset_minutes=0),
+        ]
+    )
+
+    cutoff = utcnow() - timedelta(minutes=90)
+    assert prices.prune(cutoff, dry_run=True) == 1
+    assert prices.count() == 3
+
+    assert prices.prune(cutoff) == 1
+    assert [quote.price for quote in prices.history("BTC", "USDT")] == [110, 120]
+    assert prices.prune(cutoff) == 0
+
+
+def test_latest_and_oldest_timestamps(repos):
+    prices, _ = repos
+    assert prices.latest_timestamp() is None
+    assert prices.oldest_timestamp() is None
+
+    prices.add_quotes([_quote(offset_minutes=-10), _quote(offset_minutes=0)])
+
+    latest = prices.latest_timestamp()
+    oldest = prices.oldest_timestamp()
+    assert latest is not None and oldest is not None
+    assert latest > oldest
+
+
 def test_alert_crud(repos):
     _, alerts = repos
     created = alerts.create_alert(

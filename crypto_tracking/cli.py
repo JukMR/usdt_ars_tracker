@@ -19,15 +19,16 @@ import sys
 import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
 from crypto_tracking.alerts.engine import AlertEngine
 from crypto_tracking.config import Settings, load_settings
-from crypto_tracking.domain import range_since
+from crypto_tracking.domain import range_since, utcnow
 from crypto_tracking.importer import import_csv
 from crypto_tracking.logging_config import configure_logging
 from crypto_tracking.notifiers.registry import NotifierRegistry, build_notifier_registry
-from crypto_tracking.poller import Poller
+from crypto_tracking.poller import CycleCallback, Poller
 from crypto_tracking.providers.base import PriceProvider
 from crypto_tracking.providers.registry import build_providers
 from crypto_tracking.storage.database import Database
@@ -75,6 +76,27 @@ def build_context(settings: Settings) -> AppContext:
     )
 
 
+def prune_old_prices(settings: Settings, prices: PriceRepository, *, days: int | None = None) -> int:
+    """Delete price rows older than the retention window (no-op when disabled)."""
+    retention_days = settings.retention_days if days is None else days
+    if retention_days <= 0:
+        return 0
+
+    cutoff = utcnow() - timedelta(days=retention_days)
+    deleted = prices.prune(cutoff)
+    if deleted:
+        logger.info("Retention: deleted %d price row(s) older than %s days", deleted, retention_days)
+    else:
+        logger.debug("Retention: nothing to delete (keep %s days)", retention_days)
+    return deleted
+
+
+def make_maintenance(settings: Settings, prices: PriceRepository) -> CycleCallback | None:
+    if settings.retention_days <= 0:
+        return None
+    return lambda: prune_old_prices(settings, prices)
+
+
 # --------------------------------------------------------------------- commands
 def command_serve(args: argparse.Namespace) -> int:
     settings = load_settings(args.config)
@@ -98,6 +120,7 @@ def command_serve(args: argparse.Namespace) -> int:
             context.prices,
             settings.poll_interval_seconds,
             on_cycle=context.engine.evaluate,
+            maintenance=make_maintenance(settings, context.prices),
         )
         poller_thread = threading.Thread(
             target=poller.run,
@@ -143,6 +166,7 @@ def command_poll(args: argparse.Namespace) -> int:
         context.prices,
         settings.poll_interval_seconds,
         on_cycle=context.engine.evaluate,
+        maintenance=make_maintenance(settings, context.prices),
     )
 
     if args.once:
@@ -198,6 +222,11 @@ def command_status(args: argparse.Namespace) -> int:
     )
     print(f"Providers: {', '.join(provider.name for provider in context.providers) or 'none'}")
     print(f"Notifiers: {', '.join(context.notifiers.channels()) or 'none'}")
+    retention = f"{settings.retention_days} day(s)" if settings.retention_days else "keep forever"
+    print(f"Retention: {retention}")
+    oldest = context.prices.oldest_timestamp()
+    if oldest is not None:
+        print(f"Oldest price: {oldest.isoformat()}")
 
     pairs = context.prices.pairs()
     if pairs:
@@ -206,6 +235,27 @@ def command_status(args: argparse.Namespace) -> int:
             print(f"  {row['asset']}/{row['quote_currency']}: {row['count']} row(s), latest {row['last_timestamp']}")
     else:
         print("\nNo price data yet.")
+
+    context.database.dispose()
+    return 0
+
+
+def command_prune(args: argparse.Namespace) -> int:
+    settings = load_settings(args.config)
+    context = build_context(settings)
+    days = args.days if args.days is not None else settings.retention_days
+    if days <= 0:
+        print("Nothing to do: retention is disabled. Pass --days N to prune older rows.")
+        context.database.dispose()
+        return 0
+
+    cutoff = utcnow() - timedelta(days=days)
+    affected = context.prices.prune(cutoff, dry_run=args.dry_run)
+    verb = "Would delete" if args.dry_run else "Deleted"
+    print(f"{verb} {affected} price row(s) older than {cutoff.isoformat()} ({days} day(s)).")
+    if not args.dry_run and affected and args.vacuum:
+        context.prices.vacuum()
+        print("Vacuumed the database.")
 
     context.database.dispose()
     return 0
@@ -297,6 +347,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = subparsers.add_parser("status", help="Show database, provider and pair status.")
     status.set_defaults(handler=command_status)
+
+    prune = subparsers.add_parser("prune", help="Delete price rows older than the retention window.")
+    prune.add_argument("--days", type=int, help="Retention in days (default: storage.retention_days).")
+    prune.add_argument("--dry-run", action="store_true", help="Only report how many rows would be deleted.")
+    prune.add_argument("--vacuum", action="store_true", help="Reclaim disk space afterwards (SQLite).")
+    prune.set_defaults(handler=command_prune)
 
     import_parser = subparsers.add_parser("import-csv", help="Import prices from a CSV file.")
     import_parser.add_argument("path", help="CSV file to import.")

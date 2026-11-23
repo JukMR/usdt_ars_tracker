@@ -1,0 +1,24 @@
+[Unit]
+Description=Crypto Tracker (price poller + dashboard + alerts)
+Documentation=https://github.com/JukMR/usdt_ars_tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/crypto_tracking
+Environment=PYTHONUNBUFFERED=1
+Environment=CT_CONFIG=%h/crypto_tracking/config.toml
+ExecStart=%h/crypto_tracking/.venv/bin/python -m crypto_tracking.cli serve
+Restart=always
+RestartSec=5
+
+# Security hardening (mirrors the central-hub unit).
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/crypto_tracking/data %h/crypto_tracking/logs
+
+[Install]
+WantedBy=default.target

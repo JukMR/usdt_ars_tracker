@@ -7,7 +7,7 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, func, select, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
@@ -215,6 +215,35 @@ class PriceRepository:
     def count(self) -> int:
         with self.db.session() as session:
             return int(session.scalar(select(func.count(PriceRow.id))) or 0)
+
+    def latest_timestamp(self) -> datetime | None:
+        """Timestamp of the newest stored price (``None`` when the table is empty)."""
+        with self.db.session() as session:
+            value = session.scalar(select(func.max(PriceRow.timestamp)))
+        return ensure_utc(value) if value is not None else None
+
+    def oldest_timestamp(self) -> datetime | None:
+        """Timestamp of the oldest stored price (``None`` when the table is empty)."""
+        with self.db.session() as session:
+            value = session.scalar(select(func.min(PriceRow.timestamp)))
+        return ensure_utc(value) if value is not None else None
+
+    def prune(self, before: datetime, *, dry_run: bool = False) -> int:
+        """Delete price rows older than ``before``. Returns the number affected."""
+        cutoff = ensure_utc(before)
+        with self.db.session() as session:
+            if dry_run:
+                return int(session.scalar(select(func.count(PriceRow.id)).where(PriceRow.timestamp < cutoff)) or 0)
+            result = session.execute(delete(PriceRow).where(PriceRow.timestamp < cutoff))
+            return max(int(getattr(result, "rowcount", 0) or 0), 0)
+
+    def vacuum(self) -> None:
+        """Reclaim disk space after a large prune (SQLite only)."""
+        if not self.db.url.startswith("sqlite"):
+            return
+        # VACUUM cannot run inside a transaction, so use an autocommit connection.
+        with self.db.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+            connection.execute(text("VACUUM"))
 
 
 class AlertRepository:

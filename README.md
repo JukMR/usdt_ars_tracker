@@ -25,6 +25,11 @@ and sends alerts to Telegram, email or any channel you add.
   plus dynamic loading of your own classes.
 - **Offline mode** — serve the dashboard from existing local data with
   `crypto-track serve --no-poller`.
+- **Bounded history** — optional `storage.retention_days` prunes old price rows
+  at start-up and once a day, so always-on boxes do not grow forever.
+- **Unattended deployment** — systemd user unit and an idempotent installer
+  (`deploy/install.sh`) for desktops and Raspberry Pis, plus a health probe
+  (`/health`) for dashboard aggregators such as central-hub.
 - **CSV import/export** — bring in legacy `timestamp,source,buy,sell` files or
   export the full history.
 - **TradingView links** — each pair card links out to TradingView for deeper
@@ -109,6 +114,10 @@ log_level = "INFO"
 [alerts]
 default_cooldown_seconds = 3600
 
+[storage]
+# Delete price rows older than N days (0 = keep forever).
+retention_days = 180
+
 [providers.binance]
 enabled = true
 symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
@@ -140,6 +149,7 @@ default_channels = ["log"]
 | `CT_LOG_LEVEL` | `DEBUG` | Logging level |
 | `CT_POLL_INTERVAL` | `30` | Seconds between polls (min 5) |
 | `CT_DASHBOARD_REFRESH_SECONDS` | `5` | Browser refresh interval (min 2) |
+| `CT_RETENTION_DAYS` | `180` | Prune prices older than N days (0 = forever) |
 | `CT_BINANCE_ENABLED` | `true` | Enable Binance |
 | `CT_BINANCE_SYMBOLS` | `BTCUSDT,ETHUSDT` | Binance symbols |
 | `CT_CRIPTOYA_ENABLED` | `true` | Enable Criptoya |
@@ -306,6 +316,7 @@ crypto-track poll --once           # one fetch + one alert evaluation
 crypto-track check                 # evaluate alerts once, print events
 crypto-track status                # database, providers, notifiers, pairs
 crypto-track init-db               # create tables and print counts
+crypto-track prune --days 180      # delete old price rows (--dry-run, --vacuum)
 crypto-track import-csv PATH       # import legacy or modern CSV
 crypto-track export-csv PATH       # export history
 ```
@@ -330,7 +341,8 @@ midpoint when no explicit price column exists.
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/` | Dashboard |
-| `GET` | `/api/health` | Status, row counts |
+| `GET` | `/health`, `/healthz` | Plain `ok` liveness probe (for uptime checks / central-hub) |
+| `GET` | `/api/health` | Status, row counts, last price age |
 | `GET` | `/api/config` | Pairs, ranges, providers, notifiers |
 | `GET` | `/api/notifiers` | Registered channels and classes |
 | `GET` | `/api/overview?range=24h` | Latest price + stats per pair |
@@ -361,6 +373,11 @@ SQLite by default at `data/crypto_tracking.db` (`data/` is git-ignored).
   alert is deleted.
 - `alert_deliveries` — one row per channel attempt, with success/error.
 
+When `storage.retention_days` is set, rows in `prices` older than that window
+are deleted at process start-up and once per day; alert events and deliveries
+are kept regardless. `crypto-track prune --days N --dry-run` shows what a prune
+would remove, and `--vacuum` reclaims the file space afterwards.
+
 ## Offline analysis
 
 Stop the poller and keep exploring what you already collected:
@@ -372,6 +389,61 @@ uv run crypto-track serve --no-poller
 The dashboard, chart, alerts and CSV export all read from the local database.
 `uv run crypto-track export-csv history.csv --range all` produces a portable
 snapshot for spreadsheets or notebooks.
+
+## Unattended deployment
+
+The tracker is designed to run forever next to other small services. This repo
+ships a systemd **user** unit and an installer that mirrors the central-hub
+setup:
+
+```bash
+# On the target machine (desktop, Raspberry Pi, …)
+cd ~/crypto_tracking
+bash deploy/install.sh                      # 0.0.0.0:8091
+PORT=8092 bash deploy/install.sh            # different port
+HOST=127.0.0.1 bash deploy/install.sh       # localhost only
+```
+
+`install.sh` runs `uv sync`, creates `config.toml` from
+`deploy/config.toml.template` **only when missing**, enables linger, installs
+`crypto-tracker.service` and waits until `/health` answers. It is idempotent, so
+it is also the upgrade command.
+
+From the development machine, sync a checkout to a remote host and install it
+in one step:
+
+```bash
+bash deploy/sync.sh raspberry-5 /home/dietpi/crypto_tracking
+```
+
+Day-to-day operations:
+
+```bash
+systemctl --user status crypto-tracker
+journalctl --user -u crypto-tracker -f
+systemctl --user restart crypto-tracker
+```
+
+### central-hub integration
+
+Point a central-hub service entry at the probe endpoint; `type: "http"` is
+enough because `/health` returns `200 ok`:
+
+```json
+{
+  "id": "crypto-tracking-pi",
+  "name": "Crypto Tracker (Pi)",
+  "icon": "₿",
+  "description": "Crypto price history and threshold alerts",
+  "url": "http://192.168.100.3:8091",
+  "health_endpoint": "http://192.168.100.3:8091/health",
+  "type": "http",
+  "tags": ["finance", "crypto", "pi"]
+}
+```
+
+Keep service `id`s unique across machines: central-hub caches health results by
+id.
 
 ## Development
 
@@ -407,6 +479,7 @@ crypto_tracking/
 ├── domain.py
 ├── importer.py
 └── poller.py
+deploy/              # systemd unit, installer, remote sync, config template
 tests/
 config.example.toml
 .env.example

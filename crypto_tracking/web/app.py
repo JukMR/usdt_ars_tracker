@@ -65,12 +65,23 @@ def create_app(
     # ------------------------------------------------------------------
     # Configuration / health
     # ------------------------------------------------------------------
+    @app.get("/health")
+    @app.get("/healthz")
+    def health() -> ResponseReturnValue:
+        """Cheap liveness probe used by the central-hub dashboard and systemd."""
+        return Response("ok", mimetype="text/plain")
+
     @app.get("/api/health")
     def api_health() -> ResponseReturnValue:
+        last_price_at = prices.latest_timestamp()
         return jsonify(
             {
                 "status": "ok",
                 "time": _iso(utcnow()),
+                "last_price_at": _iso(last_price_at),
+                "last_price_age_seconds": (
+                    int((utcnow() - last_price_at).total_seconds()) if last_price_at is not None else None
+                ),
                 "prices": prices.count(),
                 "alerts": alerts.count_alerts(),
                 "events": alerts.count_events(),

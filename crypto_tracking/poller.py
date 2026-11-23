@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 
 from crypto_tracking.domain import Quote
@@ -13,13 +14,15 @@ from crypto_tracking.storage.repositories import PriceRepository
 logger = logging.getLogger(__name__)
 
 CycleCallback = Callable[[], object]
+DEFAULT_MAINTENANCE_INTERVAL_SECONDS = 24 * 60 * 60
 
 
 class Poller:
     """Fetch quotes from every provider and persist them.
 
     ``on_cycle`` runs after each polling round; the CLI uses it to evaluate
-    alerts immediately after new prices arrive.
+    alerts immediately after new prices arrive. ``maintenance`` runs at start-up
+    and then once per ``maintenance_interval_seconds`` (retention pruning).
     """
 
     def __init__(
@@ -29,11 +32,16 @@ class Poller:
         interval_seconds: int = 60,
         *,
         on_cycle: CycleCallback | None = None,
+        maintenance: CycleCallback | None = None,
+        maintenance_interval_seconds: int = DEFAULT_MAINTENANCE_INTERVAL_SECONDS,
     ) -> None:
         self.providers = providers
         self.prices = prices
         self.interval_seconds = max(5, int(interval_seconds))
         self.on_cycle = on_cycle
+        self.maintenance = maintenance
+        self.maintenance_interval_seconds = max(60, int(maintenance_interval_seconds))
+        self._last_maintenance_at: float | None = None
 
     def poll_once(self) -> list[Quote]:
         """Poll every provider once and store the returned quotes."""
@@ -61,6 +69,22 @@ class Poller:
 
         return all_quotes
 
+    def run_maintenance(self, *, force: bool = False) -> None:
+        """Run the maintenance callback when it is due (or when forced)."""
+        if self.maintenance is None:
+            return
+
+        now = time.monotonic()
+        if not force and self._last_maintenance_at is not None:
+            if now - self._last_maintenance_at < self.maintenance_interval_seconds:
+                return
+
+        try:
+            self.maintenance()
+            self._last_maintenance_at = now
+        except Exception:
+            logger.exception("Maintenance task failed")
+
     def run(self, stop_event: threading.Event | None = None) -> None:
         """Run until ``stop_event`` is set (or forever when omitted)."""
         stop_event = stop_event or threading.Event()
@@ -70,6 +94,8 @@ class Poller:
             self.interval_seconds,
         )
 
+        self.run_maintenance(force=True)
+
         while not stop_event.is_set():
             self.poll_once()
             if self.on_cycle is not None:
@@ -77,6 +103,8 @@ class Poller:
                     self.on_cycle()
                 except Exception:
                     logger.exception("Post-poll callback failed")
+
+            self.run_maintenance()
 
             if stop_event.wait(self.interval_seconds):
                 break

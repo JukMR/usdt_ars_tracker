@@ -26,6 +26,7 @@ DEFAULT_CONFIG_FILENAME = "config.toml"
 DEFAULT_POLL_INTERVAL_SECONDS = 60
 DEFAULT_DASHBOARD_REFRESH_SECONDS = 10
 DEFAULT_COOLDOWN_SECONDS = 3600
+DEFAULT_RETENTION_DAYS = 0  # 0 = keep every price row forever
 
 
 @dataclass(slots=True)
@@ -62,6 +63,7 @@ class Settings:
     log_level: str = "INFO"
     dashboard_refresh_seconds: int = DEFAULT_DASHBOARD_REFRESH_SECONDS
     default_cooldown_seconds: int = DEFAULT_COOLDOWN_SECONDS
+    retention_days: int = DEFAULT_RETENTION_DAYS
     binance: BinanceConfig = field(default_factory=BinanceConfig)
     criptoya: CriptoyaConfig = field(default_factory=CriptoyaConfig)
     coingecko: CoinGeckoConfig = field(default_factory=CoinGeckoConfig)
@@ -91,6 +93,7 @@ def load_settings(config_path: Path | str | None = None, project_root: Path | st
     poller_data = data.get("poller", {})
     server_data = data.get("server", {})
     alerts_data = data.get("alerts", {})
+    storage_data = data.get("storage", {})
     providers_data = data.get("providers", {})
     notifiers_data = data.get("notifiers", {})
 
@@ -130,6 +133,7 @@ def load_settings(config_path: Path | str | None = None, project_root: Path | st
         default_cooldown_seconds=_as_int(
             alerts_data.get("default_cooldown_seconds"), DEFAULT_COOLDOWN_SECONDS, minimum=0
         ),
+        retention_days=_as_int(storage_data.get("retention_days"), DEFAULT_RETENTION_DAYS, minimum=0),
         binance=binance,
         criptoya=criptoya,
         coingecko=coingecko,
@@ -181,6 +185,9 @@ def _apply_env_overrides(settings: Settings) -> None:
 
     if value := os.environ.get("CT_DEFAULT_COOLDOWN_SECONDS"):
         settings.default_cooldown_seconds = _as_int(value, settings.default_cooldown_seconds, minimum=0)
+
+    if value := os.environ.get("CT_RETENTION_DAYS"):
+        settings.retention_days = _as_int(value, settings.retention_days, minimum=0)
 
     if value := os.environ.get("CT_BINANCE_SYMBOLS"):
         settings.binance.symbols = [part.strip().upper() for part in value.split(",") if part.strip()]

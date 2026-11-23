@@ -40,6 +40,12 @@ def test_dashboard_and_health(client):
     health = client.get("/api/health").get_json()
     assert health["status"] == "ok"
     assert health["prices"] == 0
+    assert health["last_price_at"] is None
+
+    probe = client.get("/health")
+    assert probe.status_code == 200
+    assert probe.data == b"ok"
+    assert client.get("/healthz").status_code == 200
 
 
 def test_config_endpoint(client):
