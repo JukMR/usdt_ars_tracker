@@ -7,13 +7,22 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from crypto_tracking.storage.models import Base
 
 logger = logging.getLogger(__name__)
+
+# One index per column was redundant with the composite indexes below and only
+# made inserts and files bigger. They are dropped from existing databases.
+LEGACY_SQLITE_INDEXES = (
+    "ix_prices_timestamp",
+    "ix_prices_asset",
+    "ix_prices_quote_currency",
+    "ix_prices_source",
+)
 
 
 class Database:
@@ -36,8 +45,25 @@ class Database:
         self._session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 
     def create_all(self) -> None:
-        """Create any missing tables."""
+        """Create missing tables and apply the SQLite storage optimisations."""
         Base.metadata.create_all(self.engine)
+        if self.url.startswith("sqlite"):
+            self._optimise_sqlite(self.engine)
+
+    @staticmethod
+    def _optimise_sqlite(engine: Engine) -> None:
+        """Keep the price table compact and refresh the query planner statistics.
+
+        Earlier versions created one index per column plus a composite index;
+        the single-column indexes duplicate work already covered by the composite
+        ones and add a large write/storage cost for a table that grows forever.
+        Drop them if an existing database still has them, then let SQLite update
+        its statistics.
+        """
+        with engine.begin() as connection:
+            for index_name in LEGACY_SQLITE_INDEXES:
+                connection.execute(text(f'DROP INDEX IF EXISTS "{index_name}"'))
+            connection.execute(text("PRAGMA optimize"))
 
     @contextmanager
     def session(self) -> Iterator[Session]:

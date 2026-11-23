@@ -25,8 +25,9 @@ and sends alerts to Telegram, email or any channel you add.
   plus dynamic loading of your own classes.
 - **Offline mode** — serve the dashboard from existing local data with
   `crypto-track serve --no-poller`.
-- **Bounded history** — optional `storage.retention_days` prunes old price rows
-  at start-up and once a day, so always-on boxes do not grow forever.
+- **Compact long-term history** — every poll is kept forever in SQLite. Rows are
+  small (~100 bytes) and only three indexes are maintained, so years of data fit
+  comfortably on a Raspberry Pi.
 - **Unattended deployment** — systemd user unit and an idempotent installer
   (`deploy/install.sh`) for desktops and Raspberry Pis, plus a health probe
   (`/health`) for dashboard aggregators such as central-hub.
@@ -113,10 +114,6 @@ log_level = "INFO"
 
 [alerts]
 default_cooldown_seconds = 3600
-
-[storage]
-# Delete price rows older than N days (0 = keep forever).
-retention_days = 180
 
 [providers.binance]
 enabled = true
@@ -316,7 +313,6 @@ crypto-track poll --once           # one fetch + one alert evaluation
 crypto-track check                 # evaluate alerts once, print events
 crypto-track status                # database, providers, notifiers, pairs
 crypto-track init-db               # create tables and print counts
-crypto-track prune --days 180      # delete old price rows (--dry-run, --vacuum)
 crypto-track import-csv PATH       # import legacy or modern CSV
 crypto-track export-csv PATH       # export history
 ```
@@ -373,10 +369,11 @@ SQLite by default at `data/crypto_tracking.db` (`data/` is git-ignored).
   alert is deleted.
 - `alert_deliveries` — one row per channel attempt, with success/error.
 
-When `storage.retention_days` is set, rows in `prices` older than that window
-are deleted at process start-up and once per day; alert events and deliveries
-are kept regardless. `crypto-track prune --days N --dry-run` shows what a prune
-would remove, and `--vacuum` reclaims the file space afterwards.
+History is never deleted automatically: every quote you collect stays in the
+database. The price table keeps only the composite indexes it needs
+(`(asset, quote_currency, timestamp)` and `(asset, quote_currency, source,
+timestamp)`); older databases that had one index per column drop those extra
+indexes at start-up, which keeps inserts and the file smaller.
 
 ## Offline analysis
 

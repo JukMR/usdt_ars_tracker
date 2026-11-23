@@ -17,11 +17,6 @@ log_level = "INFO"
 # Default cooldown applied to alerts created through the API/dashboard.
 default_cooldown_seconds = 3600
 
-[storage]
-# Delete price rows older than this many days (checked at start-up and daily).
-# 0 keeps every row forever. Alert events are never pruned.
-retention_days = 0
-
 [providers.binance]
 enabled = true
 # Symbols are split into asset/quote automatically (BTCUSDT -> BTC/USDT).

@@ -12,10 +12,6 @@ log_level = "INFO"
 [alerts]
 default_cooldown_seconds = 3600
 
-[storage]
-# Keep ~6 months of history. Set to 0 to keep everything.
-retention_days = 180
-
 [providers.binance]
 enabled = true
 symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]

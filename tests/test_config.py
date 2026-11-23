@@ -19,7 +19,6 @@ CONFIG_KEYS = [
     "CT_CRIPTOYA_FIAT",
     "CT_CRIPTOYA_EXCHANGES",
     "CT_COINGECKO_ENABLED",
-    "CT_RETENTION_DAYS",
 ]
 
 
@@ -59,9 +58,6 @@ log_level = "debug"
 [alerts]
 default_cooldown_seconds = 30
 
-[storage]
-retention_days = 45
-
 [providers.binance]
 enabled = true
 symbols = ["ETHUSDT"]
@@ -85,7 +81,6 @@ plugins = ["my_pkg.notifiers:DiscordNotifier"]
     assert settings.dashboard_refresh_seconds == 3
     assert settings.log_level == "DEBUG"
     assert settings.default_cooldown_seconds == 30
-    assert settings.retention_days == 45
     assert settings.binance.symbols == ["ETHUSDT"]
     assert settings.criptoya.enabled is False
     assert settings.criptoya.exchanges == ["buenbit", "ripio"]
@@ -100,7 +95,6 @@ def test_env_overrides(tmp_path, monkeypatch):
     monkeypatch.setenv("CT_CRIPTOYA_EXCHANGES", "buenbit,ripio")
     monkeypatch.setenv("CT_CRIPTOYA_ENABLED", "false")
     monkeypatch.setenv("CT_DATABASE_URL", "sqlite:///custom.db")
-    monkeypatch.setenv("CT_RETENTION_DAYS", "90")
 
     settings = load_settings(project_root=tmp_path)
 
@@ -111,7 +105,6 @@ def test_env_overrides(tmp_path, monkeypatch):
     assert settings.criptoya.exchanges == ["buenbit", "ripio"]
     assert settings.criptoya.enabled is False
     assert settings.database_url == "sqlite:///custom.db"
-    assert settings.retention_days == 90
 
 
 def test_values_are_clamped(tmp_path, monkeypatch):

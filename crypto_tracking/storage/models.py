@@ -29,10 +29,10 @@ class PriceRow(Base):
     __tablename__ = "prices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    asset: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    quote_currency: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
-    source: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    asset: Mapped[str] = mapped_column(String(32), nullable=False)
+    quote_currency: Mapped[str] = mapped_column(String(16), nullable=False)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
     price: Mapped[float] = mapped_column(Float, nullable=False)
     bid: Mapped[float | None] = mapped_column(Float, nullable=True)
     ask: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -47,6 +47,7 @@ class PriceRow(Base):
             name="uq_prices_point",
         ),
         Index("ix_prices_pair_time", "asset", "quote_currency", "timestamp"),
+        Index("ix_prices_pair_source_time", "asset", "quote_currency", "source", "timestamp"),
     )
 
 
