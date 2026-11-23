@@ -24,7 +24,7 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 echo "==> Installing dependencies in $APP_DIR"
-uv sync --no-dev --quiet
+uv sync --locked --quiet
 
 if [[ ! -f config.toml ]]; then
   echo "==> Creating config.toml (host=$HOST port=$PORT)"
@@ -50,8 +50,12 @@ systemctl --user restart "$UNIT_NAME"
 echo "==> Waiting for the dashboard on http://127.0.0.1:$PORT/health"
 for _ in $(seq 1 20); do
   if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+    LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    if [[ -z "$LAN_IP" ]]; then
+      LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')"
+    fi
     echo "==> OK: $(systemctl --user is-active "$UNIT_NAME")"
-    echo "    http://$(hostname -I 2>/dev/null | awk '{print $1}'):$PORT/  (LAN)"
+    echo "    http://${LAN_IP:-127.0.0.1}:$PORT/  (LAN)"
     exit 0
   fi
   sleep 1

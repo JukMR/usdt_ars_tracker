@@ -424,6 +424,17 @@ journalctl --user -u crypto-tracker -f
 systemctl --user restart crypto-tracker
 ```
 
+### Host firewall
+
+If the machine uses a default-deny firewall (ufw/nftables), allow the port so
+the dashboard is reachable from other machines:
+
+```bash
+sudo ufw allow from 192.168.100.0/24 to any port 8091 proto tcp comment 'crypto tracker (LAN)'
+# Optional: also reachable over Tailscale
+sudo ufw allow from 100.64.0.0/10 to any port 8091 proto tcp comment 'crypto tracker (tailscale)'
+```
+
 ### central-hub integration
 
 Point a central-hub service entry at the probe endpoint; `type: "http"` is

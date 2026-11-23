@@ -26,8 +26,9 @@ symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 enabled = true
 coin = "usdt"
 fiat = "ars"
-# Empty list = every Argentine venue criptoya returns.
-exchanges = []
+# Argentine venues to record. Empty list = every venue criptoya returns
+# (currently 30+, which makes charts busy and the database grow faster).
+exchanges = ["ripio", "letsbit", "belo", "fiwind", "lemoncash"]
 
 [providers.coingecko]
 enabled = false
