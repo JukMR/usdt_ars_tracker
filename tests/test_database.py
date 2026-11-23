@@ -13,6 +13,7 @@ def test_sqlite_keeps_only_the_composite_indexes(tmp_path):
     with database.engine.begin() as connection:
         connection.execute(text("CREATE INDEX ix_prices_asset ON prices (asset)"))
         connection.execute(text("CREATE INDEX ix_prices_source ON prices (source)"))
+        connection.execute(text("DROP INDEX ix_prices_pair_source_time"))
 
     database.create_all()
 

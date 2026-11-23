@@ -24,6 +24,13 @@ LEGACY_SQLITE_INDEXES = (
     "ix_prices_source",
 )
 
+# Indexes that must exist even on databases created by older versions, since
+# ``create_all`` does not touch tables that already exist.
+REQUIRED_SQLITE_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS ix_prices_pair_time ON prices (asset, quote_currency, timestamp)",
+    "CREATE INDEX IF NOT EXISTS ix_prices_pair_source_time ON prices (asset, quote_currency, source, timestamp)",
+)
+
 
 class Database:
     """Owns the SQLAlchemy engine and session factory."""
@@ -63,6 +70,8 @@ class Database:
         with engine.begin() as connection:
             for index_name in LEGACY_SQLITE_INDEXES:
                 connection.execute(text(f'DROP INDEX IF EXISTS "{index_name}"'))
+            for statement in REQUIRED_SQLITE_INDEXES:
+                connection.execute(text(statement))
             connection.execute(text("PRAGMA optimize"))
 
     @contextmanager
